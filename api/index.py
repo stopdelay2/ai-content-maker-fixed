@@ -69,6 +69,7 @@ if DB_AVAILABLE and db:
         # WordPress Configuration
         wordpress_user = db.Column(db.String(100))
         wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
+        wordpress_categories_count = db.Column(db.Integer, default=0)  # Store categories count
         
         # SecretSEOApp Configuration  
         neuron_project_id = db.Column(db.String(100))  # Make nullable for now
@@ -121,6 +122,7 @@ if DB_AVAILABLE and db:
                 'website_url': self.website_url,
                 'wordpress_user': self.wordpress_user,
                 'wordpress_password': self.wordpress_password,  # Remove in production UI
+                'wordpress_categories_count': self.wordpress_categories_count,
                 'daily_keywords_limit': self.daily_keywords_limit,
                 'neuron_settings': self.get_neuron_settings(),
                 'status': self.status,
@@ -578,8 +580,8 @@ def dashboard():
                                 <div class="text-sm text-gray-600 mb-4">
                                     <p x-text="project.website_url"></p>
                                     <p>Daily limit: <span x-text="project.daily_keywords_limit"></span> keywords</p>
-                                    <p x-show="project.wordpress_status?.categories" class="text-xs text-blue-600">
-                                        <span x-text="project.wordpress_status.categories.length"></span> קטגוריות באתר
+                                    <p x-show="project.wordpress_categories_count > 0" class="text-xs text-blue-600">
+                                        📂 <span x-text="project.wordpress_categories_count"></span> קטגוריות WordPress
                                     </p>
                                     <div x-show="project.neuron_settings" class="mt-2 p-2 bg-purple-50 rounded text-xs">
                                         <p class="text-purple-700 font-medium">🔍 SecretSEOApp Settings:</p>
@@ -623,6 +625,17 @@ def dashboard():
                             <div>
                                 <h1 class="text-2xl font-bold text-gray-900" x-text="currentProject?.name || 'Project Management'"></h1>
                                 <p class="text-gray-600" x-text="currentProject?.website_url"></p>
+                                <div class="flex items-center space-x-4 mt-2">
+                                    <p x-show="currentProject?.wordpress_categories_count !== undefined" class="text-sm text-blue-600">
+                                        📂 <span x-text="currentProject?.wordpress_categories_count || 0"></span> קטגוריות WordPress
+                                    </p>
+                                    <button @click="refreshCategories()" 
+                                            :disabled="refreshingCategories"
+                                            class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-600 px-2 py-1 rounded-md disabled:opacity-50">
+                                        <span x-show="!refreshingCategories">🔄 Refresh</span>
+                                        <span x-show="refreshingCategories">⏳ Refreshing...</span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="flex items-center space-x-2">
                                 <span x-show="currentProject?.wordpress_status?.connected" 
@@ -877,6 +890,7 @@ def dashboard():
                 // New project management variables
                 currentProject: null,
                 currentProjectKeywords: [],
+                refreshingCategories: false,
 
                 async loadDashboard() {
                     this.loading = true;
@@ -1089,6 +1103,42 @@ def dashboard():
                         console.error('Error loading project keywords:', error);
                         this.currentProjectKeywords = [];
                     }
+                },
+
+                async refreshCategories() {
+                    if (!this.currentProject || this.refreshingCategories) return;
+                    
+                    this.refreshingCategories = true;
+                    try {
+                        const response = await fetch(`/api/projects/${this.currentProject.id}/refresh-categories`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            // Update current project data
+                            this.currentProject.wordpress_categories_count = data.categories_count;
+                            
+                            // Also update in the projects list
+                            const projectIndex = this.projects.findIndex(p => p.id === this.currentProject.id);
+                            if (projectIndex !== -1) {
+                                this.projects[projectIndex].wordpress_categories_count = data.categories_count;
+                            }
+                            
+                            alert(`✅ ${data.message}`);
+                        } else {
+                            alert(`❌ Error: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing categories:', error);
+                        alert('❌ Error refreshing categories');
+                    } finally {
+                        this.refreshingCategories = false;
+                    }
                 }
             }
         }
@@ -1180,6 +1230,7 @@ def create_project():
             website_url=data['website_url'],
             wordpress_user=data.get('wordpress_user', ''),
             wordpress_password=data.get('wordpress_password', ''),  # In production: encrypt!
+            wordpress_categories_count=len(wordpress_status.get('categories', [])) if wordpress_status['connected'] else 0,
             daily_keywords_limit=data.get('daily_keywords_limit', 5),
             neuron_project_id=data['neuron_project_id'],
             neuron_search_engine=data['neuron_search_engine'],
@@ -1345,6 +1396,52 @@ def health_check():
             'error': str(e),
             'message': 'Database connection failed'
         }), 500
+
+@app.route('/api/projects/<int:project_id>/refresh-categories', methods=['POST'])
+def refresh_project_categories(project_id):
+    """Refresh and update WordPress categories count for a project"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Database not available'
+        }), 503
+    
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({'success': False, 'error': 'Project not found'}), 404
+        
+        if not project.wordpress_user or not project.wordpress_password:
+            return jsonify({'success': False, 'error': 'WordPress credentials not configured'}), 400
+        
+        # Test WordPress connection and get categories
+        test_result = test_wordpress_connection(
+            project.website_url,
+            project.wordpress_user, 
+            project.wordpress_password
+        )
+        
+        if test_result['connected']:
+            # Update categories count
+            categories_count = len(test_result.get('categories', []))
+            project.wordpress_categories_count = categories_count
+            project.updated_at = datetime.now(timezone.utc)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'categories_count': categories_count,
+                'message': f'Updated to {categories_count} categories'
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': f'WordPress connection failed: {test_result.get("error", "Unknown error")}'
+            }), 400
+            
+    except Exception as e:
+        print(f"Error refreshing categories: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # Vercel expects the Flask app to be available at module level
 application = app
