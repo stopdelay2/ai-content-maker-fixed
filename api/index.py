@@ -229,20 +229,35 @@ def init_database():
             except Exception as schema_error:
                 print(f"Schema update error: {schema_error}")
                 
-            # Add missing columns safely  
-            try:
-                # Check if wordpress_categories_count column exists
-                db.session.execute(db.text("SELECT wordpress_categories_count FROM projects LIMIT 1"))
-                print("wordpress_categories_count column exists")
-            except Exception:
-                print("Adding wordpress_categories_count column...")
+            # Add missing columns to keywords table
+            new_columns = [
+                ("search_engine", "VARCHAR(50)"),
+                ("language", "VARCHAR(50)"),
+                ("category_id", "INTEGER"),
+                ("tags_json", "TEXT"),
+                ("priority", "INTEGER DEFAULT 1"),
+                ("processing_by", "VARCHAR(100)"),
+                ("lease_until", "TIMESTAMP"),
+                ("error_message", "TEXT"),
+                ("attempts", "INTEGER DEFAULT 0"),
+                ("meta_description", "TEXT"),
+                ("article_content", "TEXT")
+            ]
+            
+            for column_name, column_type in new_columns:
                 try:
-                    db.session.execute(db.text("ALTER TABLE projects ADD COLUMN wordpress_categories_count INTEGER DEFAULT 0"))
-                    db.session.commit()
-                    print("Added wordpress_categories_count column successfully")
-                except Exception as e:
-                    print(f"Could not add column: {e}")
-                    db.session.rollback()
+                    # Test if column exists
+                    db.session.execute(db.text(f"SELECT {column_name} FROM keywords LIMIT 1"))
+                    print(f"{column_name} column exists")
+                except Exception:
+                    try:
+                        print(f"Adding {column_name} column...")
+                        db.session.execute(db.text(f"ALTER TABLE keywords ADD COLUMN {column_name} {column_type}"))
+                        db.session.commit()
+                        print(f"Added {column_name} column successfully")
+                    except Exception as e:
+                        print(f"Could not add {column_name} column: {e}")
+                        db.session.rollback()
                     
             # Test basic database operations
             try:
