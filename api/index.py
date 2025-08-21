@@ -69,7 +69,7 @@ if DB_AVAILABLE and db:
         # WordPress Configuration
         wordpress_user = db.Column(db.String(100))
         wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
-        wordpress_categories_count = db.Column(db.Integer, default=0)  # Store categories count
+        wordpress_categories_count = db.Column(db.Integer, default=0, nullable=True)  # Store categories count
         
         # SecretSEOApp Configuration  
         neuron_project_id = db.Column(db.String(100))  # Make nullable for now
@@ -122,7 +122,7 @@ if DB_AVAILABLE and db:
                 'website_url': self.website_url,
                 'wordpress_user': self.wordpress_user,
                 'wordpress_password': self.wordpress_password,  # Remove in production UI
-                'wordpress_categories_count': self.wordpress_categories_count,
+                'wordpress_categories_count': getattr(self, 'wordpress_categories_count', 0),
                 'daily_keywords_limit': self.daily_keywords_limit,
                 'neuron_settings': self.get_neuron_settings(),
                 'status': self.status,
@@ -1225,18 +1225,25 @@ def create_project():
             }
         
         # Create new project in database
-        project = Project(
-            name=data['name'],
-            website_url=data['website_url'],
-            wordpress_user=data.get('wordpress_user', ''),
-            wordpress_password=data.get('wordpress_password', ''),  # In production: encrypt!
-            wordpress_categories_count=len(wordpress_status.get('categories', [])) if wordpress_status['connected'] else 0,
-            daily_keywords_limit=data.get('daily_keywords_limit', 5),
-            neuron_project_id=data['neuron_project_id'],
-            neuron_search_engine=data['neuron_search_engine'],
-            neuron_language=data['neuron_language'],
-            status='active'
-        )
+        project_data = {
+            'name': data['name'],
+            'website_url': data['website_url'],
+            'wordpress_user': data.get('wordpress_user', ''),
+            'wordpress_password': data.get('wordpress_password', ''),  # In production: encrypt!
+            'daily_keywords_limit': data.get('daily_keywords_limit', 5),
+            'neuron_project_id': data['neuron_project_id'],
+            'neuron_search_engine': data['neuron_search_engine'],
+            'neuron_language': data['neuron_language'],
+            'status': 'active'
+        }
+        
+        # Add categories count if possible
+        try:
+            project_data['wordpress_categories_count'] = len(wordpress_status.get('categories', [])) if wordpress_status['connected'] else 0
+        except:
+            pass  # Column might not exist yet
+            
+        project = Project(**project_data)
         
         db.session.add(project)
         db.session.commit()
@@ -1424,7 +1431,11 @@ def refresh_project_categories(project_id):
         if test_result['connected']:
             # Update categories count
             categories_count = len(test_result.get('categories', []))
-            project.wordpress_categories_count = categories_count
+            try:
+                project.wordpress_categories_count = categories_count
+            except AttributeError:
+                # Column doesn't exist, skip updating it
+                pass
             project.updated_at = datetime.now(timezone.utc)
             db.session.commit()
             
