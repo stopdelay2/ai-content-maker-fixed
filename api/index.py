@@ -582,6 +582,27 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             'message': 'Required modules for article creation are not available in this deployment environment. This may be due to missing dependencies or path issues in Vercel.',
             'error': 'modules_not_available'
         }, 500
+    
+    # Debug: Check if environment variables are available
+    print(f"🔍 Debugging environment variables:")
+    print(f"neuron_api_key: {neuron_api_key is not None}")
+    print(f"neuron_api_endpoint: {neuron_api_endpoint}")
+    print(f"openai_model: {openai_model}")
+    print(f"openai_key: {openai_key is not None}")
+    
+    if not neuron_api_key or not neuron_api_endpoint:
+        return {
+            'success': False,
+            'message': f'Missing Neuron API configuration. API Key: {neuron_api_key is not None}, Endpoint: {neuron_api_endpoint}',
+            'error': 'missing_neuron_config'
+        }, 500
+    
+    if not openai_key or not openai_model:
+        return {
+            'success': False,
+            'message': f'Missing OpenAI configuration. API Key: {openai_key is not None}, Model: {openai_model}',
+            'error': 'missing_openai_config'
+        }, 500
 
     ###################################
     # article creation process
