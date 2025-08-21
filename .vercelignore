@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+.env
+*.pyc
+.git/
+modules/
+routes/
+templates/
+database_models.py
+database_scheduler.py
+projects_api.py
+main.py
+wsgi.py
