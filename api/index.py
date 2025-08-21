@@ -1,5 +1,5 @@
 """
-Vercel serverless function entry point
+Vercel serverless function entry point with PostgreSQL
 """
 import os
 import sys
@@ -7,22 +7,64 @@ import base64
 import json
 import requests
 from flask import Flask, render_template, jsonify, request
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 app = Flask(__name__)
 
-# Basic configuration for serverless
+# Database configuration for Vercel Postgres
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('POSTGRES_URL', 'sqlite:///fallback.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Simple in-memory storage for demo (replace with external DB in production)
-projects_data = []
-dashboard_stats = {
-    'projects': {'total': 0, 'active': 0, 'inactive': 0},
-    'keywords': {'total': 0, 'pending': 0, 'processing': 0, 'completed': 0, 'failed': 0},
-    'articles': {'total': 0}
-}
+# Initialize database
+from models import db, Project, Keyword
+db.init_app(app)
+
+# Create tables when app starts
+def init_database():
+    """Initialize database tables"""
+    try:
+        with app.app_context():
+            db.create_all()
+            print("Database tables created successfully")
+    except Exception as e:
+        print(f"Error creating tables: {e}")
+
+# Initialize database on startup
+init_database()
+
+def get_dashboard_stats():
+    """Calculate dashboard statistics from database"""
+    try:
+        projects = Project.query.all()
+        total_projects = len(projects)
+        active_projects = len([p for p in projects if p.status == 'active'])
+        
+        all_keywords = Keyword.query.all()
+        total_keywords = len(all_keywords)
+        pending_keywords = len([k for k in all_keywords if k.status == 'pending'])
+        processing_keywords = len([k for k in all_keywords if k.status == 'processing'])
+        completed_keywords = len([k for k in all_keywords if k.status == 'completed'])
+        failed_keywords = len([k for k in all_keywords if k.status == 'failed'])
+        
+        return {
+            'projects': {'total': total_projects, 'active': active_projects, 'inactive': total_projects - active_projects},
+            'keywords': {'total': total_keywords, 'pending': pending_keywords, 'processing': processing_keywords, 'completed': completed_keywords, 'failed': failed_keywords},
+            'articles': {'total': completed_keywords}
+        }
+    except Exception as e:
+        print(f"Error calculating stats: {e}")
+        return {
+            'projects': {'total': 0, 'active': 0, 'inactive': 0},
+            'keywords': {'total': 0, 'pending': 0, 'processing': 0, 'completed': 0, 'failed': 0},
+            'articles': {'total': 0}
+        }
 
 def test_wordpress_connection(site_url, username, app_password):
     """Test WordPress connection and return categories"""
@@ -731,11 +773,11 @@ def dashboard():
 </html>'''
 
 @app.route('/api/dashboard', methods=['GET'])
-def get_dashboard_stats():
+def api_dashboard_stats():
     """Get dashboard statistics"""
     return jsonify({
         'success': True,
-        'stats': dashboard_stats,
+        'stats': get_dashboard_stats(),
         'recent_activity': {
             'articles': [],
             'keywords': []
@@ -745,11 +787,17 @@ def get_dashboard_stats():
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
     """Get all projects"""
-    return jsonify({
-        'success': True,
-        'projects': projects_data,
-        'total': len(projects_data)
-    })
+    try:
+        projects = Project.query.all()
+        projects_data = [project.to_dict() for project in projects]
+        return jsonify({
+            'success': True,
+            'projects': projects_data,
+            'total': len(projects_data)
+        })
+    except Exception as e:
+        print(f"Error getting projects: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/projects', methods=['POST'])
 def create_project():
@@ -757,6 +805,7 @@ def create_project():
     try:
         data = request.get_json()
         
+        # Validate required fields
         if not data.get('name') or not data.get('website_url'):
             return jsonify({'success': False, 'error': 'Name and website URL are required'}), 400
         
@@ -777,41 +826,35 @@ def create_project():
                 'error': test_result.get('error')
             }
         
-        # Simple project creation (in production, use external database)
-        project = {
-            'id': len(projects_data) + 1,
-            'name': data['name'],
-            'website_url': data['website_url'],
-            'wordpress_user': data.get('wordpress_user', ''),
-            'wordpress_password': data.get('wordpress_password', ''),  # In production, encrypt this!
-            'daily_keywords_limit': data.get('daily_keywords_limit', 5),
-            'neuron_settings': {
-                'project_id': data['neuron_project_id'],
-                'search_engine': data['neuron_search_engine'],
-                'language': data['neuron_language']
-            },
-            'status': 'active',
-            'wordpress_status': wordpress_status,
-            'stats': {
-                'total_keywords': 0,
-                'total_articles': 0,
-                'pending_keywords': 0,
-                'completed_keywords': 0,
-                'failed_keywords': 0
-            }
-        }
+        # Create new project in database
+        project = Project(
+            name=data['name'],
+            website_url=data['website_url'],
+            wordpress_user=data.get('wordpress_user', ''),
+            wordpress_password=data.get('wordpress_password', ''),  # In production: encrypt!
+            daily_keywords_limit=data.get('daily_keywords_limit', 5),
+            neuron_project_id=data['neuron_project_id'],
+            neuron_search_engine=data['neuron_search_engine'],
+            neuron_language=data['neuron_language'],
+            status='active'
+        )
         
-        projects_data.append(project)
-        dashboard_stats['projects']['total'] += 1
-        dashboard_stats['projects']['active'] += 1
+        db.session.add(project)
+        db.session.commit()
+        
+        project_dict = project.to_dict()
+        # Add WordPress status from test
+        project_dict['wordpress_status'] = wordpress_status
         
         return jsonify({
             'success': True,
             'message': 'Project created successfully',
-            'project': project
+            'project': project_dict
         }), 201
         
     except Exception as e:
+        db.session.rollback()
+        print(f"Error creating project: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/projects/<int:project_id>/keywords', methods=['POST'])
@@ -825,42 +868,35 @@ def add_keywords_to_project(project_id):
             return jsonify({'success': False, 'error': 'No keywords provided'}), 400
         
         # Find the project
-        project = next((p for p in projects_data if p['id'] == project_id), None)
+        project = Project.query.get(project_id)
         if not project:
             return jsonify({'success': False, 'error': 'Project not found'}), 404
         
-        # Initialize keywords list if it doesn't exist
-        if 'keywords' not in project:
-            project['keywords'] = []
-        
-        # Add keywords with pending status
+        # Add keywords to database
         added_keywords = []
-        for keyword in keywords:
-            keyword_obj = {
-                'id': len(project.get('keywords', [])) + len(added_keywords) + 1,
-                'keyword': keyword.strip(),
-                'status': 'pending',  # pending, processing, completed, failed
-                'created_at': '2025-08-21',  # In production, use real timestamp
-                'article_id': None,
-                'content_score': None
-            }
+        for keyword_text in keywords:
+            keyword_obj = Keyword(
+                project_id=project_id,
+                keyword=keyword_text.strip(),
+                status='pending'
+            )
+            db.session.add(keyword_obj)
             added_keywords.append(keyword_obj)
         
-        project['keywords'].extend(added_keywords)
+        db.session.commit()
         
-        # Update stats
-        project['stats']['total_keywords'] += len(added_keywords)
-        project['stats']['pending_keywords'] += len(added_keywords)
-        dashboard_stats['keywords']['total'] += len(added_keywords)
-        dashboard_stats['keywords']['pending'] += len(added_keywords)
+        # Convert to dict for response
+        added_keywords_data = [k.to_dict() for k in added_keywords]
         
         return jsonify({
             'success': True,
             'message': f'Added {len(added_keywords)} keywords successfully',
-            'keywords': added_keywords
+            'keywords': added_keywords_data
         })
         
     except Exception as e:
+        db.session.rollback()
+        print(f"Error adding keywords: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/projects/<int:project_id>/keywords', methods=['GET'])
@@ -868,19 +904,22 @@ def get_project_keywords(project_id):
     """Get keywords for a project"""
     try:
         # Find the project
-        project = next((p for p in projects_data if p['id'] == project_id), None)
+        project = Project.query.get(project_id)
         if not project:
             return jsonify({'success': False, 'error': 'Project not found'}), 404
         
-        keywords = project.get('keywords', [])
+        # Get keywords for this project
+        keywords = Keyword.query.filter_by(project_id=project_id).all()
+        keywords_data = [k.to_dict() for k in keywords]
         
         return jsonify({
             'success': True,
-            'keywords': keywords,
-            'total': len(keywords)
+            'keywords': keywords_data,
+            'total': len(keywords_data)
         })
         
     except Exception as e:
+        print(f"Error getting project keywords: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/test-wordpress', methods=['POST'])
