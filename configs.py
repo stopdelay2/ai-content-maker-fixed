@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import json
 import yaml
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 
 
@@ -14,6 +16,17 @@ load_dotenv()
 
 # init flask app
 app = Flask(__name__)
+
+# Database configuration
+database_url = os.getenv('DATABASE_URL', 'sqlite:///content_maker.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Initialize database
+from database_models import db
+db.init_app(app)
+migrate = Migrate(app, db)
 
 app_port = os.getenv('APP_PORT')
 
