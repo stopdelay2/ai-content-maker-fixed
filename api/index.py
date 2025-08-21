@@ -9,7 +9,7 @@ import requests
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 
-print("Starting AI Content Maker API...")
+print("Starting AI Content Maker API v2...")
 print(f"Python path: {sys.path}")
 
 # Load environment variables
