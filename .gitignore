@@ -1,0 +1,9 @@
+.env
+.idea/
+__pycache__/
+
+archive/prompts.json
+prompts.yaml
+
+/keys
+/archive

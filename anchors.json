@@ -1,0 +1,27 @@
+{
+  "sites": {
+    "https://aliexprass.co.il/": {
+      "homepage": "https://aliexprass.co.il/",
+      "rules": {
+        "min_per_post": 3,
+        "max_per_post": 6,
+        "placement": "inside_h2",
+        "min_h2_len": 4
+      },
+      "anchors": [
+        { "text": "Aliexprass – דף הבית" },
+        { "text": "קניות אונליין בזול" },
+        { "text": "דילים חמים לישראל" },
+        { "text": "משלוח מהיר לישראל" },
+        { "text": "קופונים והנחות" },
+        { "text": "מוצרים מומלצים" },
+        { "text": "חדש ב-Aliexprass" },
+        { "text": "קטלוג המוצרים" },
+        { "text": "חוויית קנייה בעברית" },
+        { "text": "aliexprass.co.il" }
+        ]
+    }
+  }
+}
+
+
