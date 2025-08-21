@@ -251,6 +251,67 @@ def dashboard():
                         + Add Project
                     </button>
                 </div>
+                
+                <!-- Keywords Modal -->
+                <div x-show="showKeywords" x-cloak 
+                     class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div class="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-medium text-gray-900" x-text="`Keywords for ${selectedProject?.name || 'Project'}`"></h3>
+                                <button @click="closeKeywords()" class="text-gray-400 hover:text-gray-600">
+                                    <span class="text-2xl">&times;</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Keywords Table -->
+                            <div class="overflow-x-auto">
+                                <div x-show="projectKeywords.length === 0" class="text-center py-8 text-gray-500">
+                                    אין מילות מפתח עדיין. הוסף מילות מפתח תחילה.
+                                </div>
+                                
+                                <table x-show="projectKeywords.length > 0" class="min-w-full bg-white">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">מילת מפתח</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">סטטוס</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ציון</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">תאריך</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">פעולות</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <template x-for="keyword in projectKeywords" :key="keyword.id">
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="keyword.keyword"></td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span :class="{
+                                                        'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
+                                                        'bg-blue-100 text-blue-800': keyword.status === 'processing', 
+                                                        'bg-green-100 text-green-800': keyword.status === 'completed',
+                                                        'bg-red-100 text-red-800': keyword.status === 'failed'
+                                                    }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" x-text="keyword.status"></span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="keyword.content_score || '-'"></td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.created_at"></td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <button x-show="keyword.status === 'pending'" 
+                                                            @click="createArticle(keyword)" 
+                                                            class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs">
+                                                        צור מאמר
+                                                    </button>
+                                                    <span x-show="keyword.status === 'processing'" class="text-blue-600 text-xs">מעבד...</span>
+                                                    <span x-show="keyword.status === 'completed'" class="text-green-600 text-xs">הושלם ✓</span>
+                                                    <span x-show="keyword.status === 'failed'" class="text-red-600 text-xs">נכשל</span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Projects Grid -->
                 <div x-show="projects.length === 0" class="text-center py-12">
@@ -308,6 +369,10 @@ def dashboard():
                                     <button @click="addKeywords(project.id)" 
                                             class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm">
                                         Add Keywords
+                                    </button>
+                                    <button @click="viewKeywords(project.id)" 
+                                            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm">
+                                        View Keywords
                                     </button>
                                 </div>
                             </div>
@@ -423,6 +488,9 @@ def dashboard():
                 },
                 testingConnection: false,
                 connectionStatus: null,
+                showKeywords: false,
+                selectedProject: null,
+                projectKeywords: [],
 
                 async loadDashboard() {
                     this.loading = true;
@@ -554,6 +622,40 @@ def dashboard():
                         console.error('Error adding keywords:', error);
                         alert('Error adding keywords');
                     }
+                },
+
+                async viewKeywords(projectId) {
+                    this.selectedProject = this.projects.find(p => p.id === projectId);
+                    this.showKeywords = true;
+                    
+                    try {
+                        const response = await fetch(`/api/projects/${projectId}/keywords`);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.projectKeywords = data.keywords;
+                        } else {
+                            console.error('Error loading keywords:', data.error);
+                            this.projectKeywords = [];
+                        }
+                    } catch (error) {
+                        console.error('Error loading keywords:', error);
+                        this.projectKeywords = [];
+                    }
+                },
+
+                closeKeywords() {
+                    this.showKeywords = false;
+                    this.selectedProject = null;
+                    this.projectKeywords = [];
+                },
+
+                async createArticle(keyword) {
+                    if (confirm(`האם לייצר מאמר עבור המילה "${keyword.keyword}"?`)) {
+                        alert('פיצ\'ר יצירת מאמר יבוא בקרוב! המערכת תפנה לנוירון ותיצור תוכן מותאם SEO עם תמונות.');
+                        // TODO: Implement article creation
+                        // This will call the Neuron Writer API and WordPress publishing
+                    }
                 }
             }
         }
@@ -637,6 +739,75 @@ def create_project():
             'message': 'Project created successfully',
             'project': project
         }), 201
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/projects/<int:project_id>/keywords', methods=['POST'])
+def add_keywords_to_project(project_id):
+    """Add keywords to a project"""
+    try:
+        data = request.get_json()
+        keywords = data.get('keywords', [])
+        
+        if not keywords:
+            return jsonify({'success': False, 'error': 'No keywords provided'}), 400
+        
+        # Find the project
+        project = next((p for p in projects_data if p['id'] == project_id), None)
+        if not project:
+            return jsonify({'success': False, 'error': 'Project not found'}), 404
+        
+        # Initialize keywords list if it doesn't exist
+        if 'keywords' not in project:
+            project['keywords'] = []
+        
+        # Add keywords with pending status
+        added_keywords = []
+        for keyword in keywords:
+            keyword_obj = {
+                'id': len(project.get('keywords', [])) + len(added_keywords) + 1,
+                'keyword': keyword.strip(),
+                'status': 'pending',  # pending, processing, completed, failed
+                'created_at': '2025-08-21',  # In production, use real timestamp
+                'article_id': None,
+                'content_score': None
+            }
+            added_keywords.append(keyword_obj)
+        
+        project['keywords'].extend(added_keywords)
+        
+        # Update stats
+        project['stats']['total_keywords'] += len(added_keywords)
+        project['stats']['pending_keywords'] += len(added_keywords)
+        dashboard_stats['keywords']['total'] += len(added_keywords)
+        dashboard_stats['keywords']['pending'] += len(added_keywords)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Added {len(added_keywords)} keywords successfully',
+            'keywords': added_keywords
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/projects/<int:project_id>/keywords', methods=['GET'])
+def get_project_keywords(project_id):
+    """Get keywords for a project"""
+    try:
+        # Find the project
+        project = next((p for p in projects_data if p['id'] == project_id), None)
+        if not project:
+            return jsonify({'success': False, 'error': 'Project not found'}), 404
+        
+        keywords = project.get('keywords', [])
+        
+        return jsonify({
+            'success': True,
+            'keywords': keywords,
+            'total': len(keywords)
+        })
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
