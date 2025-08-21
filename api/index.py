@@ -29,16 +29,18 @@ if project_root not in sys.path:
 print("Path setup completed")
 
 # Import required modules for article creation
+MODULES_AVAILABLE = False
 try:
     from modules.third_party_modules.neuron_writer.neuron_general import *
     from modules.third_party_modules.openai.openai_general import *
     from modules.utils.text_and_string_functions_general import *
     from modules.anchors.anchors_genreral import *
     from configs import *
+    MODULES_AVAILABLE = True
     print("✅ Successfully imported all required modules for article creation")
 except ImportError as e:
     print(f"❌ Could not import required modules: {e}")
-    # We'll handle this gracefully in the function
+    print("Will use fallback error response for article creation")
 
 app = Flask(__name__)
 
@@ -359,18 +361,13 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
     import json
     
     # Check if required modules are available
-    try:
-        # Test if the required functions are available from the imports at module level
-        test_vars = [neuron_new_query, gpt_generate_title, sentence_to_multiline, 
-                    load_rules_and_anchors, openai_model, anchors_config_path]
-        print("✅ All required functions available for article creation")
-        
-    except NameError as e:
-        print(f"❌ Required functions not available: {e}")
+    global MODULES_AVAILABLE
+    if not MODULES_AVAILABLE:
+        print("❌ Required modules not available")
         return {
             'success': False,
-            'message': f'Module functions not available: {e}. Please check deployment configuration.',
-            'error': 'functions_not_available'
+            'message': 'Required modules for article creation are not available in this deployment environment. This may be due to missing dependencies or path issues in Vercel.',
+            'error': 'modules_not_available'
         }, 500
 
     ###################################
