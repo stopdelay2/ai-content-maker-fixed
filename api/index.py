@@ -187,6 +187,20 @@ def init_database():
         with app.app_context():
             db.create_all()
             print("Database tables created successfully")
+            
+            # Add wordpress_categories_count column if it doesn't exist
+            try:
+                result = db.session.execute(db.text("SELECT wordpress_categories_count FROM projects LIMIT 1"))
+                print("wordpress_categories_count column exists")
+            except Exception as column_error:
+                print(f"Adding wordpress_categories_count column: {column_error}")
+                try:
+                    db.session.execute(db.text("ALTER TABLE projects ADD COLUMN wordpress_categories_count INTEGER DEFAULT 0"))
+                    db.session.commit()
+                    print("Added wordpress_categories_count column successfully")
+                except Exception as alter_error:
+                    print(f"Could not add column (may already exist): {alter_error}")
+                    db.session.rollback()
     except Exception as e:
         print(f"Error creating tables: {e}")
 
