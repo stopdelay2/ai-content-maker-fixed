@@ -71,7 +71,7 @@ if DB_AVAILABLE and db:
         # WordPress Configuration
         wordpress_user = db.Column(db.String(100))
         wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
-        wordpress_categories_count = db.Column(db.Integer, default=0, nullable=True)  # Store categories count
+        # wordpress_categories_count = db.Column(db.Integer, default=0, nullable=True)  # Temporarily disabled
         
         # SecretSEOApp Configuration  
         neuron_project_id = db.Column(db.String(100))  # Make nullable for now
@@ -124,7 +124,7 @@ if DB_AVAILABLE and db:
                 'website_url': self.website_url,
                 'wordpress_user': self.wordpress_user,
                 'wordpress_password': self.wordpress_password,  # Remove in production UI
-                'wordpress_categories_count': getattr(self, 'wordpress_categories_count', 0),
+                'wordpress_categories_count': 0,  # Will be restored later
                 'daily_keywords_limit': self.daily_keywords_limit,
                 'neuron_settings': self.get_neuron_settings(),
                 'status': self.status,
@@ -1255,11 +1255,7 @@ def create_project():
             'status': 'active'
         }
         
-        # Add categories count if possible
-        try:
-            project_data['wordpress_categories_count'] = len(wordpress_status.get('categories', [])) if wordpress_status['connected'] else 0
-        except:
-            pass  # Column might not exist yet
+        # Categories count feature temporarily disabled for stability
             
         project = Project(**project_data)
         
