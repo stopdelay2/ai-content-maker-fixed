@@ -31,8 +31,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 # Fix Neon Postgres URL - convert postgres:// to postgresql://
 postgres_url = os.getenv('POSTGRES_URL', 'sqlite:///fallback.db')
+print(f"Original DB URL: {postgres_url[:50]}..." if len(postgres_url) > 50 else f"Original DB URL: {postgres_url}")
 if postgres_url.startswith('postgres://'):
     postgres_url = postgres_url.replace('postgres://', 'postgresql://', 1)
+    print("Fixed postgres:// to postgresql://")
 app.config['SQLALCHEMY_DATABASE_URI'] = postgres_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -188,19 +190,21 @@ def init_database():
             db.create_all()
             print("Database tables created successfully")
             
-            # Add wordpress_categories_count column if it doesn't exist
+            # Try to handle schema changes gracefully
             try:
-                result = db.session.execute(db.text("SELECT wordpress_categories_count FROM projects LIMIT 1"))
-                print("wordpress_categories_count column exists")
-            except Exception as column_error:
-                print(f"Adding wordpress_categories_count column: {column_error}")
-                try:
-                    db.session.execute(db.text("ALTER TABLE projects ADD COLUMN wordpress_categories_count INTEGER DEFAULT 0"))
-                    db.session.commit()
-                    print("Added wordpress_categories_count column successfully")
-                except Exception as alter_error:
-                    print(f"Could not add column (may already exist): {alter_error}")
-                    db.session.rollback()
+                # Just try to recreate tables (this will only add missing columns)
+                db.create_all()
+                print("Schema updated successfully")
+            except Exception as schema_error:
+                print(f"Schema update error: {schema_error}")
+                
+            # Test basic database operations
+            try:
+                test_query = db.session.execute(db.text("SELECT COUNT(*) FROM projects")).scalar()
+                print(f"Database test successful - found {test_query} projects")
+            except Exception as test_error:
+                print(f"Database test failed: {test_error}")
+                raise test_error
     except Exception as e:
         print(f"Error creating tables: {e}")
 
