@@ -144,14 +144,25 @@ if DB_AVAILABLE and db:
         id = db.Column(db.Integer, primary_key=True)
         project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
         
-        # Keyword Information
+        # Keyword Information  
         keyword = db.Column(db.String(255), nullable=False)
+        search_engine = db.Column(db.String(50))  # google.co.il etc
+        language = db.Column(db.String(50))  # Hebrew, English etc
+        category_id = db.Column(db.Integer)
+        tags_json = db.Column(db.Text)  # JSON string of tags
+        priority = db.Column(db.Integer, default=1)
         
         # Processing Status
-        status = db.Column(db.String(20), default='pending')  # pending, processing, completed, failed
+        status = db.Column(db.String(20), default='pending')  # pending, processing, completed, failed, paused
+        processing_by = db.Column(db.String(100))
+        lease_until = db.Column(db.DateTime(timezone=True))
+        error_message = db.Column(db.Text)
+        attempts = db.Column(db.Integer, default=0)
         
         # Article Information (when completed)
         article_title = db.Column(db.String(500))
+        meta_description = db.Column(db.Text)
+        article_content = db.Column(db.Text)  # HTML content
         content_score = db.Column(db.Integer)
         wordpress_post_id = db.Column(db.Integer)
         
@@ -159,17 +170,37 @@ if DB_AVAILABLE and db:
         created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
         processed_at = db.Column(db.DateTime(timezone=True))
         
+        def get_tags(self):
+            """Get tags as list from JSON string"""
+            if self.tags_json:
+                try:
+                    import json
+                    return json.loads(self.tags_json)
+                except:
+                    return []
+            return []
+            
         def to_dict(self):
             """Convert model to dictionary for JSON serialization"""
             return {
                 'id': self.id,
                 'project_id': self.project_id,
                 'keyword': self.keyword,
+                'search_engine': self.search_engine,
+                'language': self.language,
+                'category_id': self.category_id,
+                'tags': self.get_tags(),
+                'priority': self.priority,
                 'status': self.status,
+                'processing_by': self.processing_by,
+                'lease_until': self.lease_until.isoformat() if self.lease_until else None,
+                'error_message': self.error_message,
+                'attempts': self.attempts,
                 'article_title': self.article_title,
+                'meta_description': self.meta_description,
                 'content_score': self.content_score,
                 'wordpress_post_id': self.wordpress_post_id,
-                'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None,
+                'created_at': self.created_at.isoformat() if self.created_at else None,
                 'processed_at': self.processed_at.isoformat() if self.processed_at else None
             }
         
@@ -725,38 +756,149 @@ def dashboard():
 
                         <!-- Keywords List -->
                         <div x-show="showKeywords" class="mt-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords</h3>
-                            <div class="bg-white shadow overflow-hidden sm:rounded-md">
-                                <ul class="divide-y divide-gray-200">
-                                    <template x-for="keyword in currentProjectKeywords" :key="keyword.id">
-                                        <li class="px-6 py-4 hover:bg-gray-50">
-                                            <div class="flex items-center justify-between">
-                                                <div>
-                                                    <p class="text-sm font-medium text-gray-900" x-text="keyword.keyword"></p>
-                                                    <p class="text-sm text-gray-500">
-                                                        Added: <span x-text="new Date(keyword.created_at).toLocaleDateString()"></span>
-                                                    </p>
-                                                </div>
-                                                <div class="flex items-center space-x-2">
-                                                    <span :class="{
-                                                        'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
-                                                        'bg-blue-100 text-blue-800': keyword.status === 'processing', 
-                                                        'bg-green-100 text-green-800': keyword.status === 'completed',
-                                                        'bg-red-100 text-red-800': keyword.status === 'failed'
-                                                    }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                                        <span x-text="keyword.status"></span>
-                                                    </span>
-                                                    <span class="text-sm text-gray-500">Priority: <span x-text="keyword.priority"></span></span>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    </template>
-                                    <li x-show="!currentProjectKeywords || currentProjectKeywords.length === 0" class="px-6 py-4 text-center text-gray-500">
-                                        No keywords added yet
-                                    </li>
-                                </ul>
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords Management</h3>
+                            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keyword</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Engine</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Processing By</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lease Until</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Processed</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-for="keyword in currentProjectKeywords" :key="keyword.id">
+                                                <tr class="hover:bg-gray-50">
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-gray-900" x-text="keyword.keyword"></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.search_engine || 'N/A'"></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.language || 'N/A'"></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.category_id || 'N/A'"></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <span x-show="keyword.tags && keyword.tags.length > 0" x-text="keyword.tags.join(', ')"></span>
+                                                        <span x-show="!keyword.tags || keyword.tags.length === 0">N/A</span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <span :class="{
+                                                            'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
+                                                            'bg-blue-100 text-blue-800': keyword.status === 'processing',
+                                                            'bg-green-100 text-green-800': keyword.status === 'completed',
+                                                            'bg-red-100 text-red-800': keyword.status === 'failed',
+                                                            'bg-gray-100 text-gray-800': keyword.status === 'paused'
+                                                        }" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
+                                                            <span x-text="keyword.status"></span>
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <span x-text="keyword.created_at ? new Date(keyword.created_at).toLocaleDateString() : 'N/A'"></span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.processing_by || 'N/A'"></td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <span x-text="keyword.lease_until ? new Date(keyword.lease_until).toLocaleString() : 'N/A'"></span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <span x-text="keyword.processed_at ? new Date(keyword.processed_at).toLocaleString() : 'N/A'"></span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">
+                                                        <span x-show="keyword.error_message" x-text="keyword.error_message.substring(0, 30) + '...'"></span>
+                                                        <span x-show="!keyword.error_message">-</span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                        <button x-show="keyword.status === 'pending'" 
+                                                                @click="createArticle(keyword)" 
+                                                                :disabled="creatingArticle === keyword.id"
+                                                                class="text-blue-600 hover:text-blue-900 mr-3 disabled:opacity-50">
+                                                            <span x-show="creatingArticle !== keyword.id">🚀 Create Article</span>
+                                                            <span x-show="creatingArticle === keyword.id">⏳ Creating...</span>
+                                                        </button>
+                                                        <button x-show="keyword.status === 'completed'" 
+                                                                @click="viewArticle(keyword)" 
+                                                                class="text-green-600 hover:text-green-900">
+                                                            📖 View Article
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <tr x-show="!currentProjectKeywords || currentProjectKeywords.length === 0">
+                                                <td colspan="12" class="px-6 py-4 text-center text-gray-500">
+                                                    No keywords added yet
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Article Preview View -->
+            <div x-show="!loading && currentView === 'article'" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="mb-8">
+                    <button @click="currentView = 'project'" class="flex items-center text-gray-600 hover:text-gray-900 mb-4">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Project
+                    </button>
+                    
+                    <div class="bg-white shadow rounded-lg overflow-hidden" x-show="currentArticle">
+                        <!-- Article Header -->
+                        <div class="bg-gray-50 px-6 py-4 border-b">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h1 class="text-2xl font-bold text-gray-900" x-text="currentArticle?.title"></h1>
+                                    <p class="text-gray-600 mt-1">Keyword: <span class="font-medium" x-text="currentArticle?.keyword"></span></p>
+                                    <p class="text-gray-500 text-sm mt-1" x-text="currentArticle?.meta_description"></p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mb-2">
+                                        Content Score: <span x-text="currentArticle?.content_score || 'N/A'"></span>
+                                    </div>
+                                    <p class="text-gray-500 text-sm">
+                                        Created: <span x-text="currentArticle?.created_at ? new Date(currentArticle.created_at).toLocaleDateString() : 'N/A'"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Article Content -->
+                        <div class="px-6 py-6">
+                            <div class="prose max-w-none" x-html="currentArticle?.content">
+                                <!-- Article content will be inserted here -->
+                            </div>
+                        </div>
+
+                        <!-- Article Actions -->
+                        <div class="bg-gray-50 px-6 py-4 border-t">
+                            <div class="flex space-x-4">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium">
+                                    📝 Edit Article
+                                </button>
+                                <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium">
+                                    🚀 Publish to WordPress
+                                </button>
+                                <button class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium">
+                                    📄 Export HTML
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div x-show="!currentArticle" class="bg-white shadow rounded-lg p-8 text-center">
+                        <p class="text-gray-500">Loading article...</p>
                     </div>
                 </div>
             </div>
@@ -931,6 +1073,9 @@ def dashboard():
                 currentProjectKeywords: [],
                 refreshingCategories: false,
                 refreshingProject: null,
+                creatingArticle: null,
+                viewingArticle: null,
+                currentArticle: null,
 
                 async loadDashboard() {
                     this.loading = true;
@@ -1217,6 +1362,66 @@ def dashboard():
                     } finally {
                         this.refreshingProject = null;
                     }
+                },
+
+                async createArticle(keyword) {
+                    if (this.creatingArticle) return;
+                    
+                    this.creatingArticle = keyword.id;
+                    try {
+                        // Get project settings for article creation
+                        const project = this.currentProject;
+                        
+                        const response = await fetch(`/api/keywords/${keyword.id}/create-article`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                main_project_id: project.neuron_settings?.project_id,
+                                main_keyword: keyword.keyword,
+                                main_engine: project.neuron_settings?.search_engine,
+                                main_language: project.neuron_settings?.language,
+                                site: project.website_url
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            // Refresh keywords to show updated status
+                            await this.loadProjectKeywords(project.id);
+                            alert(`✅ Article created successfully: ${data.title}`);
+                        } else {
+                            alert(`❌ Error: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('Error creating article:', error);
+                        alert('❌ Error creating article');
+                    } finally {
+                        this.creatingArticle = null;
+                    }
+                },
+
+                async viewArticle(keyword) {
+                    try {
+                        this.currentView = 'article';
+                        this.currentArticle = null; // Show loading
+                        
+                        const response = await fetch(`/api/keywords/${keyword.id}/article`);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.currentArticle = data;
+                        } else {
+                            alert(`❌ Error: ${data.error}`);
+                            this.currentView = 'project'; // Go back
+                        }
+                    } catch (error) {
+                        console.error('Error loading article:', error);
+                        alert('❌ Error loading article');
+                        this.currentView = 'project'; // Go back
+                    }
                 }
             }
         }
@@ -1477,6 +1682,119 @@ def health_check():
             'error': str(e),
             'message': 'Database connection failed'
         }), 500
+
+@app.route('/api/keywords/<int:keyword_id>/create-article', methods=['POST'])
+def create_article_endpoint(keyword_id):
+    """Create article for a keyword using create_article_logic"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Database not available'
+        }), 503
+    
+    try:
+        data = request.get_json()
+        
+        # Get the keyword from database
+        keyword = Keyword.query.get(keyword_id)
+        if not keyword:
+            return jsonify({'success': False, 'error': 'Keyword not found'}), 404
+        
+        # Check if already processed
+        if keyword.status != 'pending':
+            return jsonify({'success': False, 'error': f'Keyword already {keyword.status}'}), 400
+        
+        # Update status to processing
+        keyword.status = 'processing'
+        keyword.processing_by = 'web_interface'
+        keyword.lease_until = datetime.now(timezone.utc)
+        db.session.commit()
+        
+        # Import and call the create_article_logic function
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from routes.create_article import create_article_logic
+            
+            # Call the actual article creation logic
+            response_data, status_code = create_article_logic(
+                main_project_id=data['main_project_id'],
+                main_keyword=data['main_keyword'], 
+                main_engine=data['main_engine'],
+                main_language=data['main_language'],
+                site=data['site']
+            )
+            
+            if status_code == 200 and response_data['success']:
+                # Update keyword with success info
+                keyword.status = 'completed'
+                keyword.processed_at = datetime.now(timezone.utc)
+                keyword.article_title = response_data['title']
+                keyword.meta_description = response_data['meta_description']
+                keyword.article_content = response_data['article_content']
+                keyword.content_score = response_data['content_score']
+                keyword.attempts += 1
+                
+                db.session.commit()
+                
+                return jsonify(response_data)
+            else:
+                # Update keyword with failure info
+                keyword.status = 'failed'
+                keyword.error_message = response_data.get('message', 'Article creation failed')
+                keyword.processed_at = datetime.now(timezone.utc)
+                db.session.commit()
+                
+                return jsonify(response_data), status_code
+                
+        except Exception as creation_error:
+            # Update keyword with error info
+            keyword.status = 'failed'
+            keyword.error_message = str(creation_error)
+            keyword.processed_at = datetime.now(timezone.utc)
+            db.session.commit()
+            
+            print(f"Error in create_article_logic: {creation_error}")
+            return jsonify({
+                'success': False,
+                'error': f'Article creation failed: {str(creation_error)}'
+            }), 500
+            
+    except Exception as e:
+        print(f"Error in create_article_endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/keywords/<int:keyword_id>/article', methods=['GET'])
+def get_article_content(keyword_id):
+    """Get article content for viewing"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Database not available'
+        }), 503
+    
+    try:
+        keyword = Keyword.query.get(keyword_id)
+        if not keyword:
+            return jsonify({'success': False, 'error': 'Keyword not found'}), 404
+        
+        if keyword.status != 'completed' or not keyword.article_content:
+            return jsonify({'success': False, 'error': 'Article not yet created'}), 400
+        
+        return jsonify({
+            'success': True,
+            'keyword': keyword.keyword,
+            'title': keyword.article_title,
+            'meta_description': keyword.meta_description,
+            'content': keyword.article_content,
+            'content_score': keyword.content_score,
+            'created_at': keyword.processed_at.isoformat() if keyword.processed_at else None
+        })
+        
+    except Exception as e:
+        print(f"Error getting article content: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # Temporarily disabled - causes database issues
 # @app.route('/api/projects/<int:project_id>/refresh-categories', methods=['POST'])
