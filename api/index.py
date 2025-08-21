@@ -23,59 +23,395 @@ dashboard_stats = {
 
 @app.route('/')
 def dashboard():
-    """Render the main dashboard"""
-    # Simple HTML response since we can't use templates in serverless easily
-    return '''
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>AI Content Maker - Dashboard</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100">
-        <div class="min-h-screen">
-            <header class="bg-white shadow">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="flex justify-between h-16">
-                        <div class="flex items-center">
-                            <h1 class="text-2xl font-bold text-gray-900">🤖 AI Content Maker</h1>
+    """Render the full dashboard"""
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Content Maker - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-100">
+    <div x-data="dashboard()" x-init="loadDashboard()" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900">🤖 AI Content Maker</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button @click="showCreateProject = true" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            + New Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-white border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex space-x-8">
+                    <a href="#" @click.prevent="currentView = 'dashboard'" 
+                       :class="currentView === 'dashboard' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                       class="border-b-2 py-4 px-1 text-sm font-medium">
+                        Dashboard
+                    </a>
+                    <a href="#" @click.prevent="currentView = 'projects'" 
+                       :class="currentView === 'projects' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                       class="border-b-2 py-4 px-1 text-sm font-medium">
+                        Projects
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- Loading -->
+            <div x-show="loading" class="flex justify-center items-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+
+            <!-- Dashboard View -->
+            <div x-show="!loading && currentView === 'dashboard'">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-sm font-bold">P</span>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Active Projects</dt>
+                                        <dd class="text-lg font-medium text-gray-900" x-text="stats.projects?.active || 0"></dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-sm font-bold">K</span>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Total Keywords</dt>
+                                        <dd class="text-lg font-medium text-gray-900" x-text="stats.keywords?.total || 0"></dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-sm font-bold">A</span>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Total Articles</dt>
+                                        <dd class="text-lg font-medium text-gray-900" x-text="stats.articles?.total || 0"></dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-sm font-bold">🚀</span>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Status</dt>
+                                        <dd class="text-lg font-medium text-green-600">Active</dd>
+                                    </dl>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </header>
-            
-            <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow rounded-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Welcome to AI Content Maker</h2>
-                    <p class="text-gray-600 mb-4">
-                        Your automated content creation system is running on Vercel serverless infrastructure.
-                    </p>
-                    
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h3 class="font-medium text-blue-900">System Status</h3>
-                        <p class="text-blue-700">✅ API endpoints are active</p>
-                        <p class="text-blue-700">⚠️ Background scheduler disabled (serverless)</p>
-                        <p class="text-blue-700">🔧 Use manual triggers for processing</p>
-                    </div>
-                    
-                    <div class="mt-6">
-                        <h3 class="font-medium text-gray-900 mb-2">Available Endpoints:</h3>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li>• GET /api/dashboard - Dashboard statistics</li>
-                            <li>• GET /api/projects - List all projects</li>
-                            <li>• POST /api/projects - Create new project</li>
-                            <li>• POST /seo/create-article - Create article</li>
-                            <li>• POST /api/trigger-scheduler - Manual trigger</li>
-                        </ul>
+
+                <!-- System Info -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">🎯 How to Get Started</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <div class="text-2xl mb-2">1️⃣</div>
+                            <h4 class="font-medium text-gray-900">Create Project</h4>
+                            <p class="text-sm text-gray-600 mt-1">Click "+ New Project" to add your WordPress site</p>
+                        </div>
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <div class="text-2xl mb-2">2️⃣</div>
+                            <h4 class="font-medium text-gray-900">Add Keywords</h4>
+                            <p class="text-sm text-gray-600 mt-1">Upload your target keywords for article generation</p>
+                        </div>
+                        <div class="text-center p-4 bg-purple-50 rounded-lg">
+                            <div class="text-2xl mb-2">3️⃣</div>
+                            <h4 class="font-medium text-gray-900">Generate Content</h4>
+                            <p class="text-sm text-gray-600 mt-1">AI will create and publish SEO articles automatically</p>
+                        </div>
                     </div>
                 </div>
-            </main>
+            </div>
+
+            <!-- Projects View -->
+            <div x-show="!loading && currentView === 'projects'">
+                <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-900">Projects</h2>
+                    <button @click="showCreateProject = true" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        + Add Project
+                    </button>
+                </div>
+
+                <!-- Projects Grid -->
+                <div x-show="projects.length === 0" class="text-center py-12">
+                    <div class="text-gray-400 text-6xl mb-4">📁</div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
+                    <p class="text-gray-500 mb-4">Create your first project to get started with AI content generation</p>
+                    <button @click="showCreateProject = true" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        Create First Project
+                    </button>
+                </div>
+
+                <div x-show="projects.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="project in projects" :key="project.id">
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="px-4 py-5 sm:p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-medium text-gray-900" x-text="project.name"></h3>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Active
+                                    </span>
+                                </div>
+                                
+                                <div class="text-sm text-gray-600 mb-4">
+                                    <p x-text="project.website_url"></p>
+                                    <p>Daily limit: <span x-text="project.daily_keywords_limit"></span> keywords</p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4 text-center">
+                                    <div>
+                                        <p class="text-2xl font-bold text-blue-600" x-text="project.stats?.total_keywords || 0"></p>
+                                        <p class="text-xs text-gray-500">Keywords</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-2xl font-bold text-green-600" x-text="project.stats?.total_articles || 0"></p>
+                                        <p class="text-xs text-gray-500">Articles</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 flex space-x-2">
+                                    <button @click="addKeywords(project.id)" 
+                                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm">
+                                        Add Keywords
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </main>
+
+        <!-- Create Project Modal -->
+        <div x-show="showCreateProject" x-cloak 
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Create New Project</h3>
+                    <form @submit.prevent="createProject()">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
+                            <input x-model="newProject.name" type="text" required 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Website URL *</label>
+                            <input x-model="newProject.website_url" type="url" required 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">WordPress Username</label>
+                            <input x-model="newProject.wordpress_user" type="text" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">WordPress Password</label>
+                            <input x-model="newProject.wordpress_password" type="password" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Daily Keywords Limit</label>
+                            <input x-model="newProject.daily_keywords_limit" type="number" min="1" max="50" value="5" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" @click="showCreateProject = false; resetNewProject()" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                                Cancel
+                            </button>
+                            <button type="submit" :disabled="creating"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">
+                                <span x-show="!creating">Create</span>
+                                <span x-show="creating">Creating...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-    </body>
-    </html>
-    '''
+    </div>
+
+    <script>
+        function dashboard() {
+            return {
+                loading: true,
+                currentView: 'dashboard',
+                projects: [],
+                stats: {},
+                recentActivity: { articles: [], keywords: [] },
+                showCreateProject: false,
+                creating: false,
+                newProject: {
+                    name: '',
+                    website_url: '',
+                    wordpress_user: '',
+                    wordpress_password: '',
+                    daily_keywords_limit: 5
+                },
+
+                async loadDashboard() {
+                    this.loading = true;
+                    try {
+                        const [dashboardResponse, projectsResponse] = await Promise.all([
+                            fetch('/api/dashboard'),
+                            fetch('/api/projects')
+                        ]);
+                        
+                        const dashboardData = await dashboardResponse.json();
+                        const projectsData = await projectsResponse.json();
+                        
+                        if (dashboardData.success) {
+                            this.stats = dashboardData.stats;
+                            this.recentActivity = dashboardData.recent_activity;
+                        }
+                        
+                        if (projectsData.success) {
+                            this.projects = projectsData.projects;
+                        }
+                    } catch (error) {
+                        console.error('Error loading dashboard:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async createProject() {
+                    this.creating = true;
+                    try {
+                        const response = await fetch('/api/projects', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.newProject)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.projects.push(data.project);
+                            this.showCreateProject = false;
+                            this.resetNewProject();
+                            alert('Project created successfully!');
+                            this.stats.projects.total++;
+                            this.stats.projects.active++;
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error creating project:', error);
+                        alert('Error creating project');
+                    } finally {
+                        this.creating = false;
+                    }
+                },
+
+                resetNewProject() {
+                    this.newProject = {
+                        name: '',
+                        website_url: '',
+                        wordpress_user: '',
+                        wordpress_password: '',
+                        daily_keywords_limit: 5
+                    };
+                },
+
+                addKeywords(projectId) {
+                    const keywords = prompt('Enter keywords separated by commas:');
+                    if (keywords) {
+                        const keywordList = keywords.split(',').map(k => k.trim()).filter(k => k);
+                        this.submitKeywords(projectId, keywordList);
+                    }
+                },
+
+                async submitKeywords(projectId, keywords) {
+                    try {
+                        const response = await fetch(`/api/projects/${projectId}/keywords`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ keywords })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(data.message);
+                            await this.loadDashboard(); // Refresh data
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error adding keywords:', error);
+                        alert('Error adding keywords');
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</body>
+</html>'''
 
 @app.route('/api/dashboard', methods=['GET'])
 def get_dashboard_stats():
