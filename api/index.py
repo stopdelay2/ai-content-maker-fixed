@@ -960,6 +960,79 @@ def dashboard():
             </div>
         </main>
 
+        <!-- Add Keywords Modal -->
+        <div x-show="showAddKeywords" x-cloak 
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Add Keywords</h3>
+                    <form @submit.prevent="submitKeywords()">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Keywords *</label>
+                            <textarea x-model="newKeywordsData.keywords" required rows="4"
+                                   placeholder="Enter keywords separated by commas"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Separate multiple keywords with commas</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Search Engine</label>
+                            <select x-model="newKeywordsData.search_engine"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Use project default</option>
+                                <option value="google.com">Google.com (Global)</option>
+                                <option value="google.co.il">Google.co.il (Israel)</option>
+                                <option value="google.co.uk">Google.co.uk (UK)</option>
+                                <option value="google.de">Google.de (Germany)</option>
+                                <option value="google.fr">Google.fr (France)</option>
+                                <option value="google.es">Google.es (Spain)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                            <select x-model="newKeywordsData.language"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Use project default</option>
+                                <option value="Hebrew">Hebrew</option>
+                                <option value="English">English</option>
+                                <option value="Spanish">Spanish</option>
+                                <option value="French">French</option>
+                                <option value="German">German</option>
+                                <option value="Italian">Italian</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category ID</label>
+                            <input x-model="newKeywordsData.category_id" type="number" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                            <input x-model="newKeywordsData.tags" type="text" 
+                                   placeholder="tag1, tag2, tag3"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Separate tags with commas</p>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" @click="showAddKeywords = false; resetNewKeywords()" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                                Cancel
+                            </button>
+                            <button type="submit" :disabled="addingKeywords"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50">
+                                <span x-show="!addingKeywords">Add Keywords</span>
+                                <span x-show="addingKeywords">Adding...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Create Project Modal -->
         <div x-show="showCreateProject" x-cloak 
              class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -1132,6 +1205,16 @@ def dashboard():
                 creatingArticle: null,
                 viewingArticle: null,
                 currentArticle: null,
+                showAddKeywords: false,
+                addingKeywords: false,
+                selectedProjectId: null,
+                newKeywordsData: {
+                    keywords: '',
+                    search_engine: '',
+                    language: '',
+                    category_id: '',
+                    tags: ''
+                },
 
                 async loadDashboard() {
                     this.loading = true;
@@ -1237,34 +1320,64 @@ def dashboard():
                 },
 
                 addKeywords(projectId) {
-                    const keywords = prompt('Enter keywords separated by commas:');
-                    if (keywords) {
-                        const keywordList = keywords.split(',').map(k => k.trim()).filter(k => k);
-                        this.submitKeywords(projectId, keywordList);
-                    }
+                    this.selectedProjectId = projectId;
+                    this.showAddKeywords = true;
+                    this.resetNewKeywords();
                 },
 
-                async submitKeywords(projectId, keywords) {
+                resetNewKeywords() {
+                    this.newKeywordsData = {
+                        keywords: '',
+                        search_engine: '',
+                        language: '',
+                        category_id: '',
+                        tags: ''
+                    };
+                },
+
+                async submitKeywords() {
+                    if (this.addingKeywords) return;
+                    
+                    this.addingKeywords = true;
                     try {
-                        const response = await fetch(`/api/projects/${projectId}/keywords`, {
+                        const keywordList = this.newKeywordsData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                        
+                        if (keywordList.length === 0) {
+                            alert('Please enter at least one keyword');
+                            return;
+                        }
+                        
+                        // Prepare keywords with their settings
+                        const keywordsWithSettings = keywordList.map(keyword => ({
+                            keyword: keyword,
+                            search_engine: this.newKeywordsData.search_engine || null,
+                            language: this.newKeywordsData.language || null,
+                            category_id: this.newKeywordsData.category_id ? parseInt(this.newKeywordsData.category_id) : null,
+                            tags: this.newKeywordsData.tags ? this.newKeywordsData.tags.split(',').map(t => t.trim()).filter(t => t) : []
+                        }));
+                        
+                        const response = await fetch(`/api/projects/${this.selectedProjectId}/keywords`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ keywords })
+                            body: JSON.stringify({ keywords: keywordsWithSettings })
                         });
                         
                         const data = await response.json();
                         
                         if (data.success) {
-                            alert(data.message);
-                            await this.loadDashboard(); // Refresh data
+                            this.showAddKeywords = false;
+                            await this.loadProjectKeywords(this.selectedProjectId);
+                            alert(`✅ Added ${keywordList.length} keywords successfully`);
                         } else {
-                            alert('Error: ' + data.error);
+                            alert('❌ Error: ' + data.error);
                         }
                     } catch (error) {
                         console.error('Error adding keywords:', error);
-                        alert('Error adding keywords');
+                        alert('❌ Error adding keywords');
+                    } finally {
+                        this.addingKeywords = false;
                     }
                 },
 
@@ -1436,8 +1549,8 @@ def dashboard():
                             body: JSON.stringify({
                                 main_project_id: project.neuron_settings?.project_id,
                                 main_keyword: keyword.keyword,
-                                main_engine: project.neuron_settings?.search_engine,
-                                main_language: project.neuron_settings?.language,
+                                main_engine: keyword.search_engine || project.neuron_settings?.search_engine,
+                                main_language: keyword.language || project.neuron_settings?.language,
                                 site: project.website_url
                             })
                         });
@@ -1621,12 +1734,28 @@ def add_keywords_to_project(project_id):
         
         # Add keywords to database
         added_keywords = []
-        for keyword_text in keywords:
-            keyword_obj = Keyword(
-                project_id=project_id,
-                keyword=keyword_text.strip(),
-                status='pending'
-            )
+        for keyword_data in keywords:
+            # Handle both old format (string) and new format (object)
+            if isinstance(keyword_data, str):
+                keyword_text = keyword_data.strip()
+                keyword_obj = Keyword(
+                    project_id=project_id,
+                    keyword=keyword_text,
+                    status='pending'
+                )
+            else:
+                # New format with settings
+                keyword_obj = Keyword(
+                    project_id=project_id,
+                    keyword=keyword_data['keyword'].strip(),
+                    search_engine=keyword_data.get('search_engine') or project.neuron_search_engine,
+                    language=keyword_data.get('language') or project.neuron_language,
+                    category_id=keyword_data.get('category_id'),
+                    tags_json=json.dumps(keyword_data.get('tags', [])) if keyword_data.get('tags') else None,
+                    priority=keyword_data.get('priority', 1),
+                    status='pending'
+                )
+            
             db.session.add(keyword_obj)
             added_keywords.append(keyword_obj)
         
@@ -1770,7 +1899,11 @@ def create_article_endpoint(keyword_id):
         try:
             import sys
             import os
-            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            # Add the project root to Python path
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            
             from routes.create_article import create_article_logic
             
             # Call the actual article creation logic
@@ -1779,7 +1912,7 @@ def create_article_endpoint(keyword_id):
                 main_keyword=data['main_keyword'], 
                 main_engine=data['main_engine'],
                 main_language=data['main_language'],
-                site=data['site']
+                site=data.get('site', '')  # Optional site parameter
             )
             
             if status_code == 200 and response_data['success']:
