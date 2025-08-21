@@ -198,6 +198,21 @@ def init_database():
             except Exception as schema_error:
                 print(f"Schema update error: {schema_error}")
                 
+            # Add missing columns safely  
+            try:
+                # Check if wordpress_categories_count column exists
+                db.session.execute(db.text("SELECT wordpress_categories_count FROM projects LIMIT 1"))
+                print("wordpress_categories_count column exists")
+            except Exception:
+                print("Adding wordpress_categories_count column...")
+                try:
+                    db.session.execute(db.text("ALTER TABLE projects ADD COLUMN wordpress_categories_count INTEGER DEFAULT 0"))
+                    db.session.commit()
+                    print("Added wordpress_categories_count column successfully")
+                except Exception as e:
+                    print(f"Could not add column: {e}")
+                    db.session.rollback()
+                    
             # Test basic database operations
             try:
                 test_query = db.session.execute(db.text("SELECT COUNT(*) FROM projects")).scalar()
