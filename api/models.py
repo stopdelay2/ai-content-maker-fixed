@@ -20,7 +20,7 @@ class Project(db.Model):
     wordpress_user = db.Column(db.String(100))
     wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
     
-    # Neuron Writer Configuration  
+    # SecretSEOApp Configuration  
     neuron_project_id = db.Column(db.String(100), nullable=False)
     neuron_search_engine = db.Column(db.String(50), nullable=False, default='google.com')
     neuron_language = db.Column(db.String(20), nullable=False, default='English')
@@ -37,7 +37,7 @@ class Project(db.Model):
     keywords = db.relationship('Keyword', backref='project', lazy=True, cascade='all, delete-orphan')
     
     def get_neuron_settings(self):
-        """Get Neuron Writer settings as dict"""
+        """Get SecretSEOApp settings as dict"""
         return {
             'project_id': self.neuron_project_id,
             'search_engine': self.neuron_search_engine,

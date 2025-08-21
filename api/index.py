@@ -395,7 +395,7 @@ def dashboard():
                                         <span x-text="project.wordpress_status.categories.length"></span> קטגוריות באתר
                                     </p>
                                     <div x-show="project.neuron_settings" class="mt-2 p-2 bg-purple-50 rounded text-xs">
-                                        <p class="text-purple-700 font-medium">🧠 Neuron Settings:</p>
+                                        <p class="text-purple-700 font-medium">🔍 SecretSEOApp Settings:</p>
                                         <p class="text-purple-600">Project: <span x-text="project.neuron_settings?.project_id"></span></p>
                                         <p class="text-purple-600">Engine: <span x-text="project.neuron_settings?.search_engine"></span></p>
                                         <p class="text-purple-600">Language: <span x-text="project.neuron_settings?.language"></span></p>
@@ -501,18 +501,18 @@ def dashboard():
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         
-                        <!-- Neuron Writer Settings Section -->
+                        <!-- SecretSEOApp Settings Section -->
                         <div class="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
                             <h4 class="text-md font-semibold text-purple-900 mb-3 flex items-center">
-                                🧠 Neuron Writer Settings
+                                🔍 SecretSEOApp Settings
                             </h4>
                             
                             <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Neuron Project ID *</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">SEO Project ID *</label>
                                 <input x-model="newProject.neuron_project_id" type="text" required 
                                        placeholder="16597e77d2635516"
                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <p class="text-xs text-gray-500 mt-1">מזהה הפרויקט מנוירון (16 תווים)</p>
+                                <p class="text-xs text-gray-500 mt-1">מזהה הפרויקט ב-SecretSEOApp (16 תווים)</p>
                             </div>
                             
                             <div class="mb-4">
@@ -757,9 +757,9 @@ def dashboard():
 
                 async createArticle(keyword) {
                     if (confirm(`האם לייצר מאמר עבור המילה "${keyword.keyword}"?`)) {
-                        alert('פיצר יצירת מאמר יבוא בקרוב! המערכת תפנה לנוירון ותיצור תוכן מותאם SEO עם תמונות.');
+                        alert('פיצר יצירת מאמר יבוא בקרוב! המערכת תפנה ל-SecretSEOApp ותיצור תוכן מותאם SEO עם תמונות.');
                         // TODO: Implement article creation
-                        // This will call the Neuron Writer API and WordPress publishing
+                        // This will call the SecretSEOApp API and WordPress publishing
                     }
                 }
             }
@@ -810,7 +810,7 @@ def create_project():
             return jsonify({'success': False, 'error': 'Name and website URL are required'}), 400
         
         if not data.get('neuron_project_id') or not data.get('neuron_search_engine') or not data.get('neuron_language'):
-            return jsonify({'success': False, 'error': 'Neuron Writer settings are required (Project ID, Search Engine, Language)'}), 400
+            return jsonify({'success': False, 'error': 'SecretSEOApp settings are required (Project ID, Search Engine, Language)'}), 400
         
         # Test WordPress connection if credentials provided
         wordpress_status = {'connected': False, 'categories': []}
