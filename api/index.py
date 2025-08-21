@@ -1900,21 +1900,45 @@ def create_article_endpoint(keyword_id):
             import sys
             import os
             
-            # Get the current file's directory (api/)
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Get the project root (parent directory)
-            project_root = os.path.dirname(current_dir)
+            # Multiple import strategies for different environments
+            create_article_logic = None
             
-            # Add project root to Python path
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
+            # Strategy 1: Try direct import (works in local development)
+            try:
+                from routes.create_article import create_article_logic
+                print("✅ Direct import successful")
+            except ImportError as e1:
+                print(f"❌ Direct import failed: {e1}")
                 
-            print(f"Current directory: {current_dir}")
-            print(f"Project root: {project_root}")
-            print(f"Python path: {sys.path}")
+                # Strategy 2: Try with project root in path
+                try:
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    project_root = os.path.dirname(current_dir)
+                    
+                    if project_root not in sys.path:
+                        sys.path.insert(0, project_root)
+                    
+                    print(f"Project root: {project_root}")
+                    from routes.create_article import create_article_logic
+                    print("✅ Project root import successful")
+                except ImportError as e2:
+                    print(f"❌ Project root import failed: {e2}")
+                    
+                    # Strategy 3: Try absolute path import
+                    try:
+                        import importlib.util
+                        routes_path = os.path.join(project_root, 'routes', 'create_article.py')
+                        spec = importlib.util.spec_from_file_location("create_article", routes_path)
+                        create_article_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(create_article_module)
+                        create_article_logic = create_article_module.create_article_logic
+                        print("✅ Absolute path import successful")
+                    except Exception as e3:
+                        print(f"❌ Absolute path import failed: {e3}")
+                        raise ImportError(f"All import strategies failed: {e1}, {e2}, {e3}")
             
-            # Try to import
-            from routes.create_article import create_article_logic
+            if create_article_logic is None:
+                raise ImportError("create_article_logic function not available")
             
             # Call the actual article creation logic
             response_data, status_code = create_article_logic(
