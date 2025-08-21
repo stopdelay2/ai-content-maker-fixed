@@ -555,7 +555,7 @@ def dashboard():
 
                 <div x-show="projects.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="project in projects" :key="project.id">
-                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div @click="openProject(project.id)" class="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-lg transition-shadow duration-200">
                             <div class="px-4 py-5 sm:p-6">
                                 <div class="flex items-center justify-between mb-4">
                                     <h3 class="text-lg font-medium text-gray-900" x-text="project.name"></h3>
@@ -600,19 +600,112 @@ def dashboard():
                                     </div>
                                 </div>
 
-                                <div class="mt-4 flex space-x-2">
-                                    <button @click="addKeywords(project.id)" 
-                                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm">
-                                        Add Keywords
-                                    </button>
-                                    <button @click="viewKeywords(project.id)" 
-                                            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm">
-                                        View Keywords
-                                    </button>
+                                <div class="mt-4 text-center">
+                                    <p class="text-sm text-gray-500">Click to manage project</p>
                                 </div>
                             </div>
                         </div>
                     </template>
+                </div>
+            </div>
+
+            <!-- Single Project Management View -->
+            <div x-show="!loading && currentView === 'project'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="mb-8">
+                    <button @click="currentView = 'projects'" class="flex items-center text-gray-600 hover:text-gray-900 mb-4">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Projects
+                    </button>
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-900" x-text="currentProject?.name || 'Project Management'"></h1>
+                                <p class="text-gray-600" x-text="currentProject?.website_url"></p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span x-show="currentProject?.wordpress_status?.connected" 
+                                      class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                    ✅ WordPress Connected
+                                </span>
+                                <span x-show="currentProject?.wordpress_status && !currentProject?.wordpress_status.connected" 
+                                      class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                                    ❌ WordPress Error
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Project Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <p class="text-3xl font-bold text-blue-600" x-text="currentProject?.stats?.total_keywords || 0"></p>
+                                <p class="text-sm text-blue-800">Total Keywords</p>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="text-3xl font-bold text-yellow-600" x-text="currentProject?.stats?.pending_keywords || 0"></p>
+                                <p class="text-sm text-yellow-800">Pending</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <p class="text-3xl font-bold text-green-600" x-text="currentProject?.stats?.completed_keywords || 0"></p>
+                                <p class="text-sm text-green-800">Completed</p>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <p class="text-3xl font-bold text-purple-600" x-text="currentProject?.stats?.total_articles || 0"></p>
+                                <p class="text-sm text-purple-800">Articles</p>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex space-x-4 mb-8">
+                            <button @click="addKeywords(currentProject?.id)" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium">
+                                Add Keywords
+                            </button>
+                            <button @click="showKeywords = !showKeywords" 
+                                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium">
+                                <span x-text="showKeywords ? 'Hide Keywords' : 'Show Keywords'"></span>
+                            </button>
+                            <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium">
+                                Export Data
+                            </button>
+                        </div>
+
+                        <!-- Keywords List -->
+                        <div x-show="showKeywords" class="mt-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords</h3>
+                            <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                                <ul class="divide-y divide-gray-200">
+                                    <template x-for="keyword in currentProjectKeywords" :key="keyword.id">
+                                        <li class="px-6 py-4 hover:bg-gray-50">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-900" x-text="keyword.keyword"></p>
+                                                    <p class="text-sm text-gray-500">
+                                                        Added: <span x-text="new Date(keyword.created_at).toLocaleDateString()"></span>
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <span :class="{
+                                                        'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
+                                                        'bg-blue-100 text-blue-800': keyword.status === 'processing', 
+                                                        'bg-green-100 text-green-800': keyword.status === 'completed',
+                                                        'bg-red-100 text-red-800': keyword.status === 'failed'
+                                                    }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
+                                                        <span x-text="keyword.status"></span>
+                                                    </span>
+                                                    <span class="text-sm text-gray-500">Priority: <span x-text="keyword.priority"></span></span>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    </template>
+                                    <li x-show="!currentProjectKeywords || currentProjectKeywords.length === 0" class="px-6 py-4 text-center text-gray-500">
+                                        No keywords added yet
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -781,6 +874,9 @@ def dashboard():
                 showKeywords: false,
                 selectedProject: null,
                 projectKeywords: [],
+                // New project management variables
+                currentProject: null,
+                currentProjectKeywords: [],
 
                 async loadDashboard() {
                     this.loading = true;
@@ -948,6 +1044,50 @@ def dashboard():
                         alert('פיצר יצירת מאמר יבוא בקרוב! המערכת תפנה ל-SecretSEOApp ותיצור תוכן מותאם SEO עם תמונות.');
                         // TODO: Implement article creation
                         // This will call the SecretSEOApp API and WordPress publishing
+                    }
+                },
+
+                // Project Management Functions
+                async openProject(projectId) {
+                    const project = this.projects.find(p => p.id === projectId);
+                    if (project) {
+                        this.currentProject = project;
+                        this.currentView = 'project';
+                        this.showKeywords = false;
+                        // Load project keywords automatically
+                        await this.loadProjectKeywords(projectId);
+                    }
+                },
+
+                async loadProjectKeywords(projectId) {
+                    try {
+                        const response = await fetch(`/api/projects/${projectId}/keywords`);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.currentProjectKeywords = data.keywords;
+                            // Update project stats based on keywords
+                            if (this.currentProject) {
+                                const total = data.keywords.length;
+                                const pending = data.keywords.filter(k => k.status === 'pending').length;
+                                const completed = data.keywords.filter(k => k.status === 'completed').length;
+                                const processing = data.keywords.filter(k => k.status === 'processing').length;
+                                
+                                this.currentProject.stats = {
+                                    total_keywords: total,
+                                    pending_keywords: pending,
+                                    completed_keywords: completed,
+                                    processing_keywords: processing,
+                                    total_articles: completed
+                                };
+                            }
+                        } else {
+                            console.error('Error loading project keywords:', data.error);
+                            this.currentProjectKeywords = [];
+                        }
+                    } catch (error) {
+                        console.error('Error loading project keywords:', error);
+                        this.currentProjectKeywords = [];
                     }
                 }
             }
