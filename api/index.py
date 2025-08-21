@@ -3,6 +3,9 @@ Vercel serverless function entry point
 """
 import os
 import sys
+import base64
+import json
+import requests
 from flask import Flask, render_template, jsonify, request
 
 # Add project root to path
@@ -20,6 +23,68 @@ dashboard_stats = {
     'keywords': {'total': 0, 'pending': 0, 'processing': 0, 'completed': 0, 'failed': 0},
     'articles': {'total': 0}
 }
+
+def test_wordpress_connection(site_url, username, app_password):
+    """Test WordPress connection and return categories"""
+    try:
+        # Clean up site URL
+        site_url = site_url.rstrip('/')
+        if not site_url.startswith(('http://', 'https://')):
+            site_url = 'https://' + site_url
+        
+        # Create auth header
+        auth = base64.b64encode(f"{username}:{app_password}".encode()).decode()
+        headers = {
+            "Authorization": f"Basic {auth}",
+            "Content-Type": "application/json"
+        }
+        
+        # Test connection with categories endpoint
+        categories_url = f"{site_url}/wp-json/wp/v2/categories"
+        response = requests.get(categories_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            categories = response.json()
+            return {
+                'success': True,
+                'connected': True,
+                'categories': categories,
+                'site_info': {
+                    'url': site_url,
+                    'categories_count': len(categories)
+                }
+            }
+        elif response.status_code == 401:
+            return {
+                'success': False,
+                'connected': False,
+                'error': 'אימות נכשל - בדוק את שם המשתמש וסיסמת האפליקציה'
+            }
+        else:
+            return {
+                'success': False,
+                'connected': False,
+                'error': f'שגיאה בחיבור: {response.status_code} - {response.text}'
+            }
+            
+    except requests.exceptions.Timeout:
+        return {
+            'success': False,
+            'connected': False,
+            'error': 'פסק זמן - האתר לא מגיב'
+        }
+    except requests.exceptions.ConnectionError:
+        return {
+            'success': False,
+            'connected': False,
+            'error': 'לא ניתן להתחבר לאתר - בדוק את כתובת האתר'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'connected': False,
+            'error': f'שגיאה כללית: {str(e)}'
+        }
 
 @app.route('/')
 def dashboard():
@@ -204,14 +269,28 @@ def dashboard():
                             <div class="px-4 py-5 sm:p-6">
                                 <div class="flex items-center justify-between mb-4">
                                     <h3 class="text-lg font-medium text-gray-900" x-text="project.name"></h3>
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Active
-                                    </span>
+                                    <div class="flex items-center space-x-2">
+                                        <span x-show="project.wordpress_status?.connected" 
+                                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            ✅ WordPress
+                                        </span>
+                                        <span x-show="project.wordpress_status && !project.wordpress_status.connected" 
+                                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                                              :title="project.wordpress_status?.error">
+                                            ❌ WordPress
+                                        </span>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            Active
+                                        </span>
+                                    </div>
                                 </div>
                                 
                                 <div class="text-sm text-gray-600 mb-4">
                                     <p x-text="project.website_url"></p>
                                     <p>Daily limit: <span x-text="project.daily_keywords_limit"></span> keywords</p>
+                                    <p x-show="project.wordpress_status?.categories" class="text-xs text-blue-600">
+                                        <span x-text="project.wordpress_status.categories.length"></span> קטגוריות באתר
+                                    </p>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4 text-center">
@@ -261,9 +340,47 @@ def dashboard():
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">WordPress Password</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">WordPress App Password *</label>
                             <input x-model="newProject.wordpress_password" type="password" 
-                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   placeholder="qp5R 8WET vkD6 YDwl Rlc3 oL7h">
+                            <p class="text-xs text-gray-500 mt-1">סיסמת אפליקציה מהגדרות המשתמש בוורדפרס</p>
+                        </div>
+                        <div class="mb-4">
+                            <button type="button" @click="testWordPressConnection()" 
+                                    :disabled="!newProject.website_url || !newProject.wordpress_user || !newProject.wordpress_password || testingConnection"
+                                    class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-3 py-2 rounded-md text-sm mb-2">
+                                <span x-show="!testingConnection">🔗 Test WordPress Connection</span>
+                                <span x-show="testingConnection">בודק חיבור...</span>
+                            </button>
+                            
+                            <!-- Connection Status -->
+                            <div x-show="connectionStatus" class="mb-2">
+                                <div x-show="connectionStatus?.success" class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div class="flex items-center">
+                                        <span class="text-green-600 text-lg mr-2">✅</span>
+                                        <span class="text-green-700 font-medium">חיבור תקין!</span>
+                                    </div>
+                                    <div x-show="connectionStatus?.categories" class="mt-2">
+                                        <p class="text-sm text-green-600 mb-1">
+                                            נמצאו <span x-text="connectionStatus?.categories?.length || 0"></span> קטגוריות:
+                                        </p>
+                                        <div class="max-h-20 overflow-y-auto text-xs text-green-600">
+                                            <template x-for="category in connectionStatus?.categories?.slice(0, 5)" :key="category.id">
+                                                <span x-text="category.name" class="inline-block bg-green-100 px-2 py-1 rounded mr-1 mb-1"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="!connectionStatus?.success" class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div class="flex items-center">
+                                        <span class="text-red-600 text-lg mr-2">❌</span>
+                                        <span class="text-red-700 font-medium">שגיאת חיבור</span>
+                                    </div>
+                                    <p class="text-sm text-red-600 mt-1" x-text="connectionStatus?.error"></p>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Daily Keywords Limit</label>
@@ -304,6 +421,8 @@ def dashboard():
                     wordpress_password: '',
                     daily_keywords_limit: 5
                 },
+                testingConnection: false,
+                connectionStatus: null,
 
                 async loadDashboard() {
                     this.loading = true;
@@ -370,6 +489,39 @@ def dashboard():
                         wordpress_password: '',
                         daily_keywords_limit: 5
                     };
+                    this.connectionStatus = null;
+                    this.testingConnection = false;
+                },
+                
+                async testWordPressConnection() {
+                    this.testingConnection = true;
+                    this.connectionStatus = null;
+                    
+                    try {
+                        const response = await fetch('/api/test-wordpress', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                website_url: this.newProject.website_url,
+                                wordpress_user: this.newProject.wordpress_user,
+                                wordpress_password: this.newProject.wordpress_password
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        this.connectionStatus = data;
+                        
+                    } catch (error) {
+                        console.error('Error testing connection:', error);
+                        this.connectionStatus = {
+                            success: false,
+                            error: 'שגיאה בבדיקת חיבור'
+                        };
+                    } finally {
+                        this.testingConnection = false;
+                    }
                 },
 
                 addKeywords(projectId) {
@@ -443,14 +595,30 @@ def create_project():
         if not data.get('name') or not data.get('website_url'):
             return jsonify({'success': False, 'error': 'Name and website URL are required'}), 400
         
+        # Test WordPress connection if credentials provided
+        wordpress_status = {'connected': False, 'categories': []}
+        if data.get('wordpress_user') and data.get('wordpress_password'):
+            test_result = test_wordpress_connection(
+                data['website_url'],
+                data['wordpress_user'],
+                data['wordpress_password']
+            )
+            wordpress_status = {
+                'connected': test_result['connected'],
+                'categories': test_result.get('categories', []),
+                'error': test_result.get('error')
+            }
+        
         # Simple project creation (in production, use external database)
         project = {
             'id': len(projects_data) + 1,
             'name': data['name'],
             'website_url': data['website_url'],
             'wordpress_user': data.get('wordpress_user', ''),
+            'wordpress_password': data.get('wordpress_password', ''),  # In production, encrypt this!
             'daily_keywords_limit': data.get('daily_keywords_limit', 5),
             'status': 'active',
+            'wordpress_status': wordpress_status,
             'stats': {
                 'total_keywords': 0,
                 'total_articles': 0,
@@ -472,6 +640,32 @@ def create_project():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/test-wordpress', methods=['POST'])
+def test_wordpress():
+    """Test WordPress connection"""
+    try:
+        data = request.get_json()
+        
+        if not data.get('website_url') or not data.get('wordpress_user') or not data.get('wordpress_password'):
+            return jsonify({
+                'success': False, 
+                'error': 'Website URL, username and password are required'
+            }), 400
+        
+        result = test_wordpress_connection(
+            data['website_url'],
+            data['wordpress_user'],
+            data['wordpress_password']
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
 
 @app.route('/api/trigger-scheduler', methods=['POST'])
 def trigger_scheduler():
