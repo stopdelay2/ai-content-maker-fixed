@@ -17,10 +17,16 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 app = Flask(__name__)
 
-# Database configuration for Vercel Postgres
+# Database configuration for Neon Postgres
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+# Use Neon Postgres connection string (pooled version is recommended)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('POSTGRES_URL', 'sqlite:///fallback.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_timeout': 20,
+    'pool_recycle': -1,
+    'pool_pre_ping': True
+}
 
 # Initialize database
 from models import db, Project, Keyword
@@ -38,6 +44,23 @@ def init_database():
 
 # Initialize database on startup
 init_database()
+
+# Add database health check
+def check_database_connection():
+    """Check if database connection is working"""
+    try:
+        with app.app_context():
+            # Try to execute a simple query
+            result = db.session.execute(db.text('SELECT 1')).fetchone()
+            print(f"Database connection successful: {result}")
+            return True
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        return False
+
+# Check connection on startup
+print("Checking database connection...")
+check_database_connection()
 
 def get_dashboard_stats():
     """Calculate dashboard statistics from database"""
@@ -959,11 +982,30 @@ def trigger_scheduler():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'environment': 'vercel-serverless',
-        'message': 'AI Content Maker API is running'
-    })
+    try:
+        # Test database connection
+        with app.app_context():
+            db.session.execute(db.text('SELECT 1')).fetchone()
+            db_status = 'connected'
+        
+        # Get basic stats
+        stats = get_dashboard_stats()
+        
+        return jsonify({
+            'status': 'healthy',
+            'environment': 'vercel-serverless',
+            'database': db_status,
+            'database_url': 'neon-postgres' if 'neon' in (os.getenv('POSTGRES_URL', '') or '') else 'fallback',
+            'stats': stats,
+            'message': 'AI Content Maker API is running with Neon Postgres'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'database': 'disconnected', 
+            'error': str(e),
+            'message': 'Database connection failed'
+        }), 500
 
 # Vercel expects the Flask app to be available at module level
 application = app
