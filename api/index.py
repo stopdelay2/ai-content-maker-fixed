@@ -71,7 +71,7 @@ if DB_AVAILABLE and db:
         # WordPress Configuration
         wordpress_user = db.Column(db.String(100))
         wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
-        # wordpress_categories_count = db.Column(db.Integer, default=0, nullable=True)  # Temporarily disabled
+        wordpress_categories_count = db.Column(db.Integer, default=0, nullable=True)  # Store categories count
         
         # SecretSEOApp Configuration  
         neuron_project_id = db.Column(db.String(100))  # Make nullable for now
@@ -124,7 +124,7 @@ if DB_AVAILABLE and db:
                 'website_url': self.website_url,
                 'wordpress_user': self.wordpress_user,
                 'wordpress_password': self.wordpress_password,  # Remove in production UI
-                'wordpress_categories_count': 0,  # Will be restored later
+                'wordpress_categories_count': getattr(self, 'wordpress_categories_count', 0),
                 'daily_keywords_limit': self.daily_keywords_limit,
                 'neuron_settings': self.get_neuron_settings(),
                 'status': self.status,
@@ -598,9 +598,15 @@ def dashboard():
                                 <div class="text-sm text-gray-600 mb-4">
                                     <p x-text="project.website_url"></p>
                                     <p>Daily limit: <span x-text="project.daily_keywords_limit"></span> keywords</p>
-                                    <p x-show="project.wordpress_categories_count > 0" class="text-xs text-blue-600">
-                                        📂 <span x-text="project.wordpress_categories_count"></span> קטגוריות WordPress
-                                    </p>
+                                    <div x-show="project.wordpress_user" class="flex items-center justify-between text-xs text-blue-600">
+                                        <span>📂 <span x-text="project.wordpress_categories_count || 0"></span> קטגוריות WordPress</span>
+                                        <button @click.stop="quickRefreshCategories(project.id)" 
+                                                :disabled="refreshingProject === project.id"
+                                                class="ml-2 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50">
+                                            <span x-show="refreshingProject !== project.id">🔄</span>
+                                            <span x-show="refreshingProject === project.id">⏳</span>
+                                        </button>
+                                    </div>
                                     <div x-show="project.neuron_settings" class="mt-2 p-2 bg-purple-50 rounded text-xs">
                                         <p class="text-purple-700 font-medium">🔍 SecretSEOApp Settings:</p>
                                         <p class="text-purple-600">Project: <span x-text="project.neuron_settings?.project_id"></span></p>
@@ -909,6 +915,7 @@ def dashboard():
                 currentProject: null,
                 currentProjectKeywords: [],
                 refreshingCategories: false,
+                refreshingProject: null,
 
                 async loadDashboard() {
                     this.loading = true;
@@ -1157,6 +1164,44 @@ def dashboard():
                     } finally {
                         this.refreshingCategories = false;
                     }
+                },
+
+                async quickRefreshCategories(projectId) {
+                    if (this.refreshingProject) return;
+                    
+                    this.refreshingProject = projectId;
+                    try {
+                        const response = await fetch(`/api/projects/${projectId}/refresh-categories`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            // Update project in the list
+                            const projectIndex = this.projects.findIndex(p => p.id === projectId);
+                            if (projectIndex !== -1) {
+                                this.projects[projectIndex].wordpress_categories_count = data.categories_count;
+                            }
+                            
+                            // Also update current project if it's the same
+                            if (this.currentProject && this.currentProject.id === projectId) {
+                                this.currentProject.wordpress_categories_count = data.categories_count;
+                            }
+                            
+                            // Show success message briefly
+                            console.log(`✅ Updated to ${data.categories_count} categories`);
+                        } else {
+                            console.error(`❌ Error: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing categories:', error);
+                    } finally {
+                        this.refreshingProject = null;
+                    }
                 }
             }
         }
@@ -1255,7 +1300,9 @@ def create_project():
             'status': 'active'
         }
         
-        # Categories count feature temporarily disabled for stability
+        # Save categories count from WordPress connection test
+        if wordpress_status['connected']:
+            project_data['wordpress_categories_count'] = len(wordpress_status.get('categories', []))
             
         project = Project(**project_data)
         
@@ -1445,11 +1492,7 @@ def refresh_project_categories(project_id):
         if test_result['connected']:
             # Update categories count
             categories_count = len(test_result.get('categories', []))
-            try:
-                project.wordpress_categories_count = categories_count
-            except AttributeError:
-                # Column doesn't exist, skip updating it
-                pass
+            project.wordpress_categories_count = categories_count
             project.updated_at = datetime.now(timezone.utc)
             db.session.commit()
             
