@@ -9,11 +9,21 @@ import requests
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 
+print("Starting AI Content Maker API...")
+print(f"Python path: {sys.path}")
+
 # Load environment variables
 load_dotenv()
 
+# Check if POSTGRES_URL is available
+postgres_url = os.getenv('POSTGRES_URL')
+print(f"Database URL available: {'Yes' if postgres_url else 'No'}")
+if postgres_url:
+    print(f"Database type: {'neon' if 'neon' in postgres_url else 'other'}")
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+print("Path setup completed")
 
 app = Flask(__name__)
 
@@ -42,8 +52,14 @@ def init_database():
     except Exception as e:
         print(f"Error creating tables: {e}")
 
-# Initialize database on startup
-init_database()
+# Initialize database with error handling
+try:
+    print("Attempting to initialize database...")
+    init_database()
+    print("Database initialization completed")
+except Exception as e:
+    print(f"Database initialization failed: {e}")
+    print("Continuing without database - will use fallback mode")
 
 # Add database health check
 def check_database_connection():
@@ -58,12 +74,15 @@ def check_database_connection():
         print(f"Database connection failed: {e}")
         return False
 
-# Check connection on startup
-print("Checking database connection...")
-check_database_connection()
+# Check connection on startup with error handling
+try:
+    print("Checking database connection...")
+    check_database_connection()
+except Exception as e:
+    print(f"Initial database check failed: {e}")
 
 def get_dashboard_stats():
-    """Calculate dashboard statistics from database"""
+    """Calculate dashboard statistics from database with fallback"""
     try:
         projects = Project.query.all()
         total_projects = len(projects)
@@ -82,7 +101,8 @@ def get_dashboard_stats():
             'articles': {'total': completed_keywords}
         }
     except Exception as e:
-        print(f"Error calculating stats: {e}")
+        print(f"Error calculating stats from database: {e}")
+        print("Using fallback stats")
         return {
             'projects': {'total': 0, 'active': 0, 'inactive': 0},
             'keywords': {'total': 0, 'pending': 0, 'processing': 0, 'completed': 0, 'failed': 0},
@@ -809,7 +829,7 @@ def api_dashboard_stats():
 
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
-    """Get all projects"""
+    """Get all projects with database fallback"""
     try:
         projects = Project.query.all()
         projects_data = [project.to_dict() for project in projects]
@@ -819,12 +839,18 @@ def get_projects():
             'total': len(projects_data)
         })
     except Exception as e:
-        print(f"Error getting projects: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Error getting projects from database: {e}")
+        # Return empty list as fallback
+        return jsonify({
+            'success': True,
+            'projects': [],
+            'total': 0,
+            'message': 'Database connection failed - using fallback mode'
+        })
 
 @app.route('/api/projects', methods=['POST'])
 def create_project():
-    """Create a new project"""
+    """Create a new project with database fallback"""
     try:
         data = request.get_json()
         
