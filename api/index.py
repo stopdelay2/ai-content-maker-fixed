@@ -1899,11 +1899,21 @@ def create_article_endpoint(keyword_id):
         try:
             import sys
             import os
-            # Add the project root to Python path
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+            # Get the current file's directory (api/)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Get the project root (parent directory)
+            project_root = os.path.dirname(current_dir)
+            
+            # Add project root to Python path
             if project_root not in sys.path:
                 sys.path.insert(0, project_root)
+                
+            print(f"Current directory: {current_dir}")
+            print(f"Project root: {project_root}")
+            print(f"Python path: {sys.path}")
             
+            # Try to import
             from routes.create_article import create_article_logic
             
             # Call the actual article creation logic
