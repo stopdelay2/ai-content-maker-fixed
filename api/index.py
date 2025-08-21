@@ -334,6 +334,253 @@ def get_dashboard_stats():
             'articles': {'total': 0}
         }
 
+# Article creation logic (copied from routes/create_article.py for Vercel compatibility)
+def create_article_logic_embedded(main_project_id, main_keyword, main_engine, main_language, site):
+    """
+    Does all the neuron and GPT logic for creating the article.
+    Returns (response_dict, status_code).
+    """
+    import time
+    import json
+    
+    # We need to import the required functions here
+    # Since we can't import from modules in Vercel, we'll handle this gracefully
+    try:
+        import sys
+        import os
+        
+        # Add project root to path for imports
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        # Try to import required functions
+        from modules.third_party_modules.neuron_writer.neuron_general import *
+        from modules.third_party_modules.openai.openai_general import *
+        from modules.utils.text_and_string_functions_general import *
+        from modules.anchors.anchors_genreral import *
+        from configs import *
+        
+        print("✅ Successfully imported all required modules for article creation")
+        
+    except ImportError as e:
+        print(f"❌ Could not import required modules: {e}")
+        # Return a graceful fallback response
+        return {
+            'success': False,
+            'message': f'Module import failed: {e}. Please check Vercel deployment configuration.',
+            'error': 'import_failed'
+        }, 500
+
+    ###################################
+    # article creation process
+    ###################################
+
+    #################################################################
+    # create a neuron query, and get query results
+    #################################################################
+    def neuron_create_and_get_query(main_project_id, main_keyword, main_engine, main_language):
+        main_search_keyword_terms = sentence_to_multiline(main_keyword)
+
+        # make a new query with neuron
+        new_query_response = neuron_new_query(main_project_id, main_keyword, main_engine, main_language)
+        main_query_id = new_query_response['query']
+
+        # sleep for 65 seconds (a new query usually takes around 60 seconds until it's finished)
+        print(f'response for new neuron query creation: {new_query_response} sleeping for 65 seconds, to wait for the query to be ready.')
+        time.sleep(65)
+
+        # get query results from neuron
+        start_time = time.time()
+
+        while True:
+            neuron_query_response_data = neuron_get_query(main_query_id)
+            status = neuron_query_response_data.get("status", "").lower()
+
+            if status in ["waiting", "in progress"]:
+                elapsed_time = time.time() - start_time
+                if elapsed_time >= 120:
+                    print("Exceeded 120 seconds. Stopping the loop.")
+                    break
+                print(f"Status is '{status}'. Waiting 10 seconds before checking again...")
+                time.sleep(10)
+            elif status == "ready":
+                print("Status is 'ready'. Proceeding with the rest of the program...")
+                break
+            elif status == "not found":
+                print("Status is 'not found'. Exiting main() function.")
+                return
+            else:
+                print(f"Received unexpected status '{status}'. Exiting.")
+                break
+
+        print("Continuing with the rest of the code...")
+
+        return_dict = {
+            "neuron_query_response_data": neuron_query_response_data,
+            "main_query_id": main_query_id,
+            "main_search_keyword_terms": main_search_keyword_terms,
+        }
+        return return_dict
+
+    #################################################################
+    # create title, meta-description, article, and upload to neuron
+    #################################################################
+    def neuron_create_title_desc_article(neuron_query_dict):
+        neuron_query_response_data = neuron_query_dict["neuron_query_response_data"]
+        main_search_keyword_terms = neuron_query_dict["main_search_keyword_terms"]
+        main_query_id = neuron_query_dict["main_query_id"]
+
+        # create title with GPT
+        main_title_terms = neuron_query_response_data['terms']['title']
+        main_article_title = gpt_generate_title(openai_model, main_title_terms, main_search_keyword_terms)
+
+        # create meta-description with GPT
+        main_description_terms = neuron_query_response_data['terms']["desc"]
+        main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
+
+        # create article with GPT
+        main_h1_terms = neuron_query_response_data['terms']["h1"]
+        main_h2_terms = neuron_query_response_data['terms']["h2"]
+        title_terms_string = objects_array_to_multiline(main_title_terms)
+        h1_terms_string = objects_array_to_multiline(main_h1_terms)
+        h2_terms_string = objects_array_to_multiline(main_h2_terms)
+
+        content_basic_terms = neuron_query_response_data['terms']['content_basic']
+        content_extended_terms = neuron_query_response_data['terms']['content_extended']
+        all_content_terms = content_basic_terms + content_extended_terms
+        main_content_terms = format_terms_with_usage(all_content_terms)
+
+        # create main article with GPT
+        main_article_content = gpt_generate_article(openai_model, title_terms_string, h1_terms_string, h2_terms_string, main_content_terms)
+
+        # upload initial article to neuron writer API, and get initial score
+        import_content_response = neuron_import_content(main_query_id, main_article_content, main_article_title, main_article_description)
+
+        return_dict = {
+            "main_article_title": main_article_title,
+            "main_article_description": main_article_description,
+            "main_article_content": main_article_content,
+            "import_content_response": import_content_response,
+            "h1_terms_string": h1_terms_string,
+            "h2_terms_string": h2_terms_string,
+            "main_search_keyword_terms": main_search_keyword_terms,
+            "main_query_id": main_query_id,
+            "neuron_query_response_data": neuron_query_response_data
+        }
+        return return_dict
+
+    #################################################################
+    # content optimization process
+    #################################################################
+    def content_optimization_process(content_and_terms_dict, site):
+        result_dict = {'success': False}
+
+        main_article_title = content_and_terms_dict['main_article_title']
+        main_article_description = content_and_terms_dict['main_article_description']
+        h1_terms_string = content_and_terms_dict['h1_terms_string']
+        h2_terms_string = content_and_terms_dict['h2_terms_string']
+        main_article_content = content_and_terms_dict['main_article_content']
+        main_search_keyword_terms = content_and_terms_dict['main_search_keyword_terms']
+        import_content_response = content_and_terms_dict['import_content_response']
+        main_query_id = content_and_terms_dict['main_query_id']
+        neuron_query_response_data = content_and_terms_dict['neuron_query_response_data']
+
+        main_h1_h2_terms = f'H1 TERMS:\n{h1_terms_string}\n\nH2 TERMS:{h2_terms_string}'
+        current_score = import_content_response["content_score"]
+
+        def optimize_headings(main_article_content, current_score):
+            rules_str, anchors_str = load_rules_and_anchors(anchors_config_path, site)
+            main_optimized_headings = gpt_optimize_headings(openai_model, main_article_content, main_h1_h2_terms, main_search_keyword_terms, rules_str, anchors_str, site)
+            updated_html_content_dict = switch_headings(main_article_content, main_optimized_headings, current_score, main_query_id, main_article_title, main_article_description)
+            
+            print(updated_html_content_dict['message'])
+            updated_html_content = updated_html_content_dict['updated_html_content']
+            
+            if updated_html_content_dict['success'] is False:
+                return result_dict
+            
+            result_dict['success'] = True
+            result_dict['updated_html_content'] = updated_html_content
+            
+            new_evaluate_content_response = neuron_evaluate_content(main_query_id, updated_html_content, main_article_title, main_article_description)
+            current_score = new_evaluate_content_response['content_score']
+            return updated_html_content, current_score
+
+        # optimize headings
+        print('\nheadings optimization round 1:\n')
+        updated_html_content, current_score = optimize_headings(main_article_content, current_score)
+
+        # optimize for terms not used (grey terms)
+        main_terms_not_used = get_terms_not_used(updated_html_content, neuron_query_response_data)
+        if len(main_terms_not_used) > 0:
+            updated_html_content = gpt_add_terms_not_used(openai_model, updated_html_content, main_terms_not_used)
+            new_evaluate_content_response = neuron_evaluate_content(main_query_id, updated_html_content, main_article_title, main_article_description)
+            if current_score <= new_evaluate_content_response['content_score']:
+                neuron_import_content(main_query_id, updated_html_content, main_article_title, main_article_description)
+                current_score = new_evaluate_content_response['content_score']
+        else:
+            print('\nfound 0 terms not used (grey) - skipping grey term optimization process\n')
+
+        # optimize for terms to use less (red terms) - 2 rounds
+        for round_num in [1, 2]:
+            print(f'\n{["first", "2nd"][round_num-1]} round of red-terms reduction\n')
+            main_terms_to_use_less = get_terms_used_excessively(updated_html_content, neuron_query_response_data)
+            if len(main_terms_to_use_less) > 0:
+                main_terms_to_reduce_string = format_use_less_objects(main_terms_to_use_less)
+                updated_html_content = gpt_reduce_terms(openai_model, updated_html_content, main_terms_to_reduce_string)
+                new_evaluate_content_response = neuron_import_content(main_query_id, updated_html_content, main_article_title, main_article_description)
+            else:
+                print(f'\nfound 0 red terms - skipping red term optimization process\n')
+
+        return_dict = {
+            'main_article_title': main_article_title,
+            'main_article_description': main_article_description,
+            'updated_html_content': updated_html_content,
+            'content_score': int(new_evaluate_content_response['content_score'] if new_evaluate_content_response else current_score)
+        }
+        return return_dict
+
+    #################################################################
+    # run all the grouped-processes in sequence
+    #################################################################
+
+    try:
+        # make neuron query, and get query result
+        neuron_response_dict = neuron_create_and_get_query(main_project_id, main_keyword, main_engine, main_language)
+        print(f'\n{neuron_response_dict}\n')
+
+        # create: title, meta-description, article content
+        initial_content_evaluation = neuron_create_title_desc_article(neuron_response_dict)
+        print(f'\n{initial_content_evaluation}\n')
+
+        # content optimization
+        optimized_content_dict = content_optimization_process(initial_content_evaluation, site)
+
+        response_data = {
+            'success': True,
+            'message': 'Article content created successfully.',
+            'title': optimized_content_dict['main_article_title'],
+            'meta_description': optimized_content_dict['main_article_description'],
+            'article_content': optimized_content_dict['updated_html_content'],
+            'content_score': optimized_content_dict['content_score']
+        }
+
+        print('Article creation completed successfully')
+        print(json.dumps(response_data, indent=4))
+        return response_data, 200
+
+    except Exception as e:
+        error_msg = f'Error in article creation process: {str(e)}'
+        print(error_msg)
+        return {
+            'success': False,
+            'message': error_msg,
+            'error': 'creation_failed'
+        }, 500
+
+
 def test_wordpress_connection(site_url, username, app_password):
     """Test WordPress connection and return categories"""
     try:
@@ -1895,53 +2142,9 @@ def create_article_endpoint(keyword_id):
         keyword.lease_until = datetime.now(timezone.utc)
         db.session.commit()
         
-        # Import and call the create_article_logic function
+        # Call the embedded article creation logic
         try:
-            import sys
-            import os
-            
-            # Multiple import strategies for different environments
-            create_article_logic = None
-            
-            # Strategy 1: Try direct import (works in local development)
-            try:
-                from routes.create_article import create_article_logic
-                print("✅ Direct import successful")
-            except ImportError as e1:
-                print(f"❌ Direct import failed: {e1}")
-                
-                # Strategy 2: Try with project root in path
-                try:
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    project_root = os.path.dirname(current_dir)
-                    
-                    if project_root not in sys.path:
-                        sys.path.insert(0, project_root)
-                    
-                    print(f"Project root: {project_root}")
-                    from routes.create_article import create_article_logic
-                    print("✅ Project root import successful")
-                except ImportError as e2:
-                    print(f"❌ Project root import failed: {e2}")
-                    
-                    # Strategy 3: Try absolute path import
-                    try:
-                        import importlib.util
-                        routes_path = os.path.join(project_root, 'routes', 'create_article.py')
-                        spec = importlib.util.spec_from_file_location("create_article", routes_path)
-                        create_article_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(create_article_module)
-                        create_article_logic = create_article_module.create_article_logic
-                        print("✅ Absolute path import successful")
-                    except Exception as e3:
-                        print(f"❌ Absolute path import failed: {e3}")
-                        raise ImportError(f"All import strategies failed: {e1}, {e2}, {e3}")
-            
-            if create_article_logic is None:
-                raise ImportError("create_article_logic function not available")
-            
-            # Call the actual article creation logic
-            response_data, status_code = create_article_logic(
+            response_data, status_code = create_article_logic_embedded(
                 main_project_id=data['main_project_id'],
                 main_keyword=data['main_keyword'], 
                 main_engine=data['main_engine'],
