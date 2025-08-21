@@ -715,7 +715,7 @@ def dashboard():
 
                 async createArticle(keyword) {
                     if (confirm(`האם לייצר מאמר עבור המילה "${keyword.keyword}"?`)) {
-                        alert('פיצ\'ר יצירת מאמר יבוא בקרוב! המערכת תפנה לנוירון ותיצור תוכן מותאם SEO עם תמונות.');
+                        alert('פיצר יצירת מאמר יבוא בקרוב! המערכת תפנה לנוירון ותיצור תוכן מותאם SEO עם תמונות.');
                         // TODO: Implement article creation
                         // This will call the Neuron Writer API and WordPress publishing
                     }
