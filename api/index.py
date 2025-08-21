@@ -352,6 +352,12 @@ def dashboard():
                                     <p x-show="project.wordpress_status?.categories" class="text-xs text-blue-600">
                                         <span x-text="project.wordpress_status.categories.length"></span> קטגוריות באתר
                                     </p>
+                                    <div x-show="project.neuron_settings" class="mt-2 p-2 bg-purple-50 rounded text-xs">
+                                        <p class="text-purple-700 font-medium">🧠 Neuron Settings:</p>
+                                        <p class="text-purple-600">Project: <span x-text="project.neuron_settings?.project_id"></span></p>
+                                        <p class="text-purple-600">Engine: <span x-text="project.neuron_settings?.search_engine"></span></p>
+                                        <p class="text-purple-600">Language: <span x-text="project.neuron_settings?.language"></span></p>
+                                    </div>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4 text-center">
@@ -452,6 +458,57 @@ def dashboard():
                             <input x-model="newProject.daily_keywords_limit" type="number" min="1" max="50" value="5" 
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
+                        
+                        <!-- Neuron Writer Settings Section -->
+                        <div class="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                            <h4 class="text-md font-semibold text-purple-900 mb-3 flex items-center">
+                                🧠 Neuron Writer Settings
+                            </h4>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Neuron Project ID *</label>
+                                <input x-model="newProject.neuron_project_id" type="text" required 
+                                       placeholder="16597e77d2635516"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <p class="text-xs text-gray-500 mt-1">מזהה הפרויקט מנוירון (16 תווים)</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Search Engine *</label>
+                                <select x-model="newProject.neuron_search_engine" required 
+                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="">בחר מנוע חיפוש</option>
+                                    <option value="google.com">Google.com (Global)</option>
+                                    <option value="google.co.uk">Google.co.uk (UK)</option>
+                                    <option value="google.de">Google.de (Germany)</option>
+                                    <option value="google.fr">Google.fr (France)</option>
+                                    <option value="google.es">Google.es (Spain)</option>
+                                    <option value="google.it">Google.it (Italy)</option>
+                                    <option value="google.com.au">Google.com.au (Australia)</option>
+                                    <option value="google.ca">Google.ca (Canada)</option>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">מנוע החיפוש לאנליזה (לדוגמא: google.co.uk)</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Language *</label>
+                                <select x-model="newProject.neuron_language" required 
+                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="">בחר שפה</option>
+                                    <option value="English">English</option>
+                                    <option value="Hebrew">Hebrew</option>
+                                    <option value="Spanish">Spanish</option>
+                                    <option value="French">French</option>
+                                    <option value="German">German</option>
+                                    <option value="Italian">Italian</option>
+                                    <option value="Portuguese">Portuguese</option>
+                                    <option value="Russian">Russian</option>
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Japanese">Japanese</option>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">שפת התוכן שייווצר (לדוגמא: English)</p>
+                            </div>
+                        </div>
                         <div class="flex justify-end space-x-3">
                             <button type="button" @click="showCreateProject = false; resetNewProject()" 
                                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
@@ -484,7 +541,10 @@ def dashboard():
                     website_url: '',
                     wordpress_user: '',
                     wordpress_password: '',
-                    daily_keywords_limit: 5
+                    daily_keywords_limit: 5,
+                    neuron_project_id: '',
+                    neuron_search_engine: '',
+                    neuron_language: ''
                 },
                 testingConnection: false,
                 connectionStatus: null,
@@ -555,7 +615,10 @@ def dashboard():
                         website_url: '',
                         wordpress_user: '',
                         wordpress_password: '',
-                        daily_keywords_limit: 5
+                        daily_keywords_limit: 5,
+                        neuron_project_id: '',
+                        neuron_search_engine: '',
+                        neuron_language: ''
                     };
                     this.connectionStatus = null;
                     this.testingConnection = false;
@@ -697,6 +760,9 @@ def create_project():
         if not data.get('name') or not data.get('website_url'):
             return jsonify({'success': False, 'error': 'Name and website URL are required'}), 400
         
+        if not data.get('neuron_project_id') or not data.get('neuron_search_engine') or not data.get('neuron_language'):
+            return jsonify({'success': False, 'error': 'Neuron Writer settings are required (Project ID, Search Engine, Language)'}), 400
+        
         # Test WordPress connection if credentials provided
         wordpress_status = {'connected': False, 'categories': []}
         if data.get('wordpress_user') and data.get('wordpress_password'):
@@ -719,6 +785,11 @@ def create_project():
             'wordpress_user': data.get('wordpress_user', ''),
             'wordpress_password': data.get('wordpress_password', ''),  # In production, encrypt this!
             'daily_keywords_limit': data.get('daily_keywords_limit', 5),
+            'neuron_settings': {
+                'project_id': data['neuron_project_id'],
+                'search_engine': data['neuron_search_engine'],
+                'language': data['neuron_language']
+            },
             'status': 'active',
             'wordpress_status': wordpress_status,
             'stats': {
