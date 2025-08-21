@@ -37,6 +37,23 @@ def dashboard():
     """Render the main dashboard"""
     return render_template('dashboard.html')
 
+# Manual scheduler trigger for serverless environments
+@app.route('/api/trigger-scheduler', methods=['POST'])
+def trigger_scheduler():
+    """Manually trigger the scheduler (for serverless environments)"""
+    try:
+        from flask import request
+        # Simple authentication
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or auth_header != f'Bearer {article_maker_main_api_key}':
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        # Run the scheduler
+        database_scheduled_job()
+        return jsonify({'success': True, 'message': 'Scheduler executed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 ####################################################
 # Setup APScheduler
 ####################################################
@@ -69,16 +86,15 @@ scheduler.add_job(
 #     misfire_grace_time=None
 # )
 
-# Start the scheduler only in the main process (avoid Flask reloader double-start)
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+# Disable scheduler for Vercel deployment (serverless doesn't support background processes)
+# Start the scheduler only in local development
+if os.environ.get("VERCEL") != "1" and (not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
     scheduler.start()
-
-# Optionally run the job once at startup (based on your flag)
-if run_keywords_on_startup:
-    database_scheduled_job()
-
-# Shut down the scheduler when exiting the app
-atexit.register(lambda: scheduler.shutdown(wait=False))
+    # Optionally run the job once at startup (based on your flag)
+    if run_keywords_on_startup:
+        database_scheduled_job()
+    # Shut down the scheduler when exiting the app
+    atexit.register(lambda: scheduler.shutdown(wait=False))
 
 
 ##################################
