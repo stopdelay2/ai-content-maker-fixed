@@ -22,8 +22,23 @@ if postgres_url:
     print(f"Database type: {'neon' if 'neon' in postgres_url else 'other'}")
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+project_root = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 print("Path setup completed")
+
+# Import required modules for article creation
+try:
+    from modules.third_party_modules.neuron_writer.neuron_general import *
+    from modules.third_party_modules.openai.openai_general import *
+    from modules.utils.text_and_string_functions_general import *
+    from modules.anchors.anchors_genreral import *
+    from configs import *
+    print("✅ Successfully imported all required modules for article creation")
+except ImportError as e:
+    print(f"❌ Could not import required modules: {e}")
+    # We'll handle this gracefully in the function
 
 app = Flask(__name__)
 
@@ -343,34 +358,19 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
     import time
     import json
     
-    # We need to import the required functions here
-    # Since we can't import from modules in Vercel, we'll handle this gracefully
+    # Check if required modules are available
     try:
-        import sys
-        import os
+        # Test if the required functions are available from the imports at module level
+        test_vars = [neuron_new_query, gpt_generate_title, sentence_to_multiline, 
+                    load_rules_and_anchors, openai_model, anchors_config_path]
+        print("✅ All required functions available for article creation")
         
-        # Add project root to path for imports
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(current_dir)
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-        
-        # Try to import required functions
-        from modules.third_party_modules.neuron_writer.neuron_general import *
-        from modules.third_party_modules.openai.openai_general import *
-        from modules.utils.text_and_string_functions_general import *
-        from modules.anchors.anchors_genreral import *
-        from configs import *
-        
-        print("✅ Successfully imported all required modules for article creation")
-        
-    except ImportError as e:
-        print(f"❌ Could not import required modules: {e}")
-        # Return a graceful fallback response
+    except NameError as e:
+        print(f"❌ Required functions not available: {e}")
         return {
             'success': False,
-            'message': f'Module import failed: {e}. Please check Vercel deployment configuration.',
-            'error': 'import_failed'
+            'message': f'Module functions not available: {e}. Please check deployment configuration.',
+            'error': 'functions_not_available'
         }, 500
 
     ###################################
