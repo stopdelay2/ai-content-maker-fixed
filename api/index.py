@@ -1315,9 +1315,7 @@ def create_project():
             'status': 'active'
         }
         
-        # Save categories count from WordPress connection test
-        if wordpress_status['connected']:
-            project_data['wordpress_categories_count'] = len(wordpress_status.get('categories', []))
+        # Categories count feature temporarily disabled for stability
             
         project = Project(**project_data)
         
@@ -1480,51 +1478,11 @@ def health_check():
             'message': 'Database connection failed'
         }), 500
 
-@app.route('/api/projects/<int:project_id>/refresh-categories', methods=['POST'])
-def refresh_project_categories(project_id):
-    """Refresh and update WordPress categories count for a project"""
-    if not DB_AVAILABLE:
-        return jsonify({
-            'success': False,
-            'error': 'Database not available'
-        }), 503
-    
-    try:
-        project = Project.query.get(project_id)
-        if not project:
-            return jsonify({'success': False, 'error': 'Project not found'}), 404
-        
-        if not project.wordpress_user or not project.wordpress_password:
-            return jsonify({'success': False, 'error': 'WordPress credentials not configured'}), 400
-        
-        # Test WordPress connection and get categories
-        test_result = test_wordpress_connection(
-            project.website_url,
-            project.wordpress_user, 
-            project.wordpress_password
-        )
-        
-        if test_result['connected']:
-            # Update categories count
-            categories_count = len(test_result.get('categories', []))
-            project.wordpress_categories_count = categories_count
-            project.updated_at = datetime.now(timezone.utc)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'categories_count': categories_count,
-                'message': f'Updated to {categories_count} categories'
-            })
-        else:
-            return jsonify({
-                'success': False, 
-                'error': f'WordPress connection failed: {test_result.get("error", "Unknown error")}'
-            }), 400
-            
-    except Exception as e:
-        print(f"Error refreshing categories: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+# Temporarily disabled - causes database issues
+# @app.route('/api/projects/<int:project_id>/refresh-categories', methods=['POST'])
+# def refresh_project_categories(project_id):
+#     """Refresh and update WordPress categories count for a project"""
+#     return jsonify({'success': False, 'error': 'Feature temporarily disabled'}), 503
 
 # Vercel expects the Flask app to be available at module level
 application = app
