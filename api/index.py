@@ -29,8 +29,11 @@ app = Flask(__name__)
 
 # Database configuration for Neon Postgres
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
-# Use Neon Postgres connection string (pooled version is recommended)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('POSTGRES_URL', 'sqlite:///fallback.db')
+# Fix Neon Postgres URL - convert postgres:// to postgresql://
+postgres_url = os.getenv('POSTGRES_URL', 'sqlite:///fallback.db')
+if postgres_url.startswith('postgres://'):
+    postgres_url = postgres_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = postgres_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_timeout': 20,
@@ -39,127 +42,141 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # Initialize database inline to avoid import issues
-from datetime import datetime, timezone
-from flask_sqlalchemy import SQLAlchemy
-import json
+try:
+    from datetime import datetime, timezone
+    from flask_sqlalchemy import SQLAlchemy
+    import json
 
-db = SQLAlchemy()
-db.init_app(app)
+    db = SQLAlchemy()
+    db.init_app(app)
+    print("SQLAlchemy initialized successfully")
+    DB_AVAILABLE = True
+except Exception as e:
+    print(f"Failed to initialize SQLAlchemy: {e}")
+    DB_AVAILABLE = False
+    db = None
 
-class Project(db.Model):
-    """Model for managing content creation projects"""
-    __tablename__ = 'projects'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    website_url = db.Column(db.String(255), nullable=False)
-    
-    # WordPress Configuration
-    wordpress_user = db.Column(db.String(100))
-    wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
-    
-    # SecretSEOApp Configuration  
-    neuron_project_id = db.Column(db.String(100), nullable=False)
-    neuron_search_engine = db.Column(db.String(50), nullable=False, default='google.com')
-    neuron_language = db.Column(db.String(20), nullable=False, default='English')
-    
-    # Settings
-    daily_keywords_limit = db.Column(db.Integer, default=5)
-    
-    # Status and Timestamps
-    status = db.Column(db.String(20), default='active')  # active, paused, inactive
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    
-    # Relationships
-    keywords = db.relationship('Keyword', backref='project', lazy=True, cascade='all, delete-orphan')
-    
-    def get_neuron_settings(self):
-        """Get SecretSEOApp settings as dict"""
-        return {
-            'project_id': self.neuron_project_id,
-            'search_engine': self.neuron_search_engine,
-            'language': self.neuron_language
-        }
-    
-    def get_wordpress_status(self):
-        """Get WordPress connection status (will be updated later)"""
-        return {
-            'connected': bool(self.wordpress_user and self.wordpress_password),
-            'categories': [],  # Will be populated by connection test
-            'error': None
-        }
-    
-    def get_stats(self):
-        """Get project statistics"""
-        return {
-            'total_keywords': len(self.keywords),
-            'pending_keywords': len([k for k in self.keywords if k.status == 'pending']),
-            'processing_keywords': len([k for k in self.keywords if k.status == 'processing']),
-            'completed_keywords': len([k for k in self.keywords if k.status == 'completed']),
-            'failed_keywords': len([k for k in self.keywords if k.status == 'failed']),
-            'total_articles': len([k for k in self.keywords if k.status == 'completed'])
-        }
-    
-    def to_dict(self):
-        """Convert model to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'website_url': self.website_url,
-            'wordpress_user': self.wordpress_user,
-            'wordpress_password': self.wordpress_password,  # Remove in production UI
-            'daily_keywords_limit': self.daily_keywords_limit,
-            'neuron_settings': self.get_neuron_settings(),
-            'status': self.status,
-            'wordpress_status': self.get_wordpress_status(),
-            'stats': self.get_stats(),
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-    
-    def __repr__(self):
-        return f'<Project {self.name}>'
+# Define models only if DB is available
+if DB_AVAILABLE and db:
+    class Project(db.Model):
+        """Model for managing content creation projects"""
+        __tablename__ = 'projects'
+        
+        id = db.Column(db.Integer, primary_key=True)
+        name = db.Column(db.String(255), nullable=False)
+        website_url = db.Column(db.String(255), nullable=False)
+        
+        # WordPress Configuration
+        wordpress_user = db.Column(db.String(100))
+        wordpress_password = db.Column(db.String(255))  # In production: encrypt this!
+        
+        # SecretSEOApp Configuration  
+        neuron_project_id = db.Column(db.String(100))  # Make nullable for now
+        neuron_search_engine = db.Column(db.String(50), default='google.com')
+        neuron_language = db.Column(db.String(20), default='English')
+        
+        # Settings
+        daily_keywords_limit = db.Column(db.Integer, default=5)
+        
+        # Status and Timestamps
+        status = db.Column(db.String(20), default='active')  # active, paused, inactive
+        created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+        updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+        
+        # Relationships
+        keywords = db.relationship('Keyword', backref='project', lazy=True, cascade='all, delete-orphan')
+        
+        def get_neuron_settings(self):
+            """Get SecretSEOApp settings as dict"""
+            return {
+                'project_id': self.neuron_project_id or '',
+                'search_engine': self.neuron_search_engine or 'google.com',
+                'language': self.neuron_language or 'English'
+            }
+        
+        def get_wordpress_status(self):
+            """Get WordPress connection status (will be updated later)"""
+            return {
+                'connected': bool(self.wordpress_user and self.wordpress_password),
+                'categories': [],  # Will be populated by connection test
+                'error': None
+            }
+        
+        def get_stats(self):
+            """Get project statistics"""
+            return {
+                'total_keywords': len(self.keywords),
+                'pending_keywords': len([k for k in self.keywords if k.status == 'pending']),
+                'processing_keywords': len([k for k in self.keywords if k.status == 'processing']),
+                'completed_keywords': len([k for k in self.keywords if k.status == 'completed']),
+                'failed_keywords': len([k for k in self.keywords if k.status == 'failed']),
+                'total_articles': len([k for k in self.keywords if k.status == 'completed'])
+            }
+        
+        def to_dict(self):
+            """Convert model to dictionary for JSON serialization"""
+            return {
+                'id': self.id,
+                'name': self.name,
+                'website_url': self.website_url,
+                'wordpress_user': self.wordpress_user,
+                'wordpress_password': self.wordpress_password,  # Remove in production UI
+                'daily_keywords_limit': self.daily_keywords_limit,
+                'neuron_settings': self.get_neuron_settings(),
+                'status': self.status,
+                'wordpress_status': self.get_wordpress_status(),
+                'stats': self.get_stats(),
+                'created_at': self.created_at.isoformat() if self.created_at else None,
+                'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            }
+        
+        def __repr__(self):
+            return f'<Project {self.name}>'
 
+    class Keyword(db.Model):
+        """Model for managing keyword processing queue"""
+        __tablename__ = 'keywords'
+        
+        id = db.Column(db.Integer, primary_key=True)
+        project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+        
+        # Keyword Information
+        keyword = db.Column(db.String(255), nullable=False)
+        
+        # Processing Status
+        status = db.Column(db.String(20), default='pending')  # pending, processing, completed, failed
+        
+        # Article Information (when completed)
+        article_title = db.Column(db.String(500))
+        content_score = db.Column(db.Integer)
+        wordpress_post_id = db.Column(db.Integer)
+        
+        # Timestamps
+        created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+        processed_at = db.Column(db.DateTime(timezone=True))
+        
+        def to_dict(self):
+            """Convert model to dictionary for JSON serialization"""
+            return {
+                'id': self.id,
+                'project_id': self.project_id,
+                'keyword': self.keyword,
+                'status': self.status,
+                'article_title': self.article_title,
+                'content_score': self.content_score,
+                'wordpress_post_id': self.wordpress_post_id,
+                'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None,
+                'processed_at': self.processed_at.isoformat() if self.processed_at else None
+            }
+        
+        def __repr__(self):
+            return f'<Keyword {self.keyword} ({self.status})>'
 
-class Keyword(db.Model):
-    """Model for managing keyword processing queue"""
-    __tablename__ = 'keywords'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    
-    # Keyword Information
-    keyword = db.Column(db.String(255), nullable=False)
-    
-    # Processing Status
-    status = db.Column(db.String(20), default='pending')  # pending, processing, completed, failed
-    
-    # Article Information (when completed)
-    article_title = db.Column(db.String(500))
-    content_score = db.Column(db.Integer)
-    wordpress_post_id = db.Column(db.Integer)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    processed_at = db.Column(db.DateTime(timezone=True))
-    
-    def to_dict(self):
-        """Convert model to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'project_id': self.project_id,
-            'keyword': self.keyword,
-            'status': self.status,
-            'article_title': self.article_title,
-            'content_score': self.content_score,
-            'wordpress_post_id': self.wordpress_post_id,
-            'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else None,
-            'processed_at': self.processed_at.isoformat() if self.processed_at else None
-        }
-    
-    def __repr__(self):
-        return f'<Keyword {self.keyword} ({self.status})>'
+else:
+    # Fallback classes for when DB is not available
+    print("Creating fallback classes without database")
+    Project = None
+    Keyword = None
 
 # Create tables when app starts
 def init_database():
@@ -202,6 +219,14 @@ except Exception as e:
 
 def get_dashboard_stats():
     """Calculate dashboard statistics from database with fallback"""
+    if not DB_AVAILABLE or not Project:
+        print("Database not available, returning empty stats")
+        return {
+            'projects': {'total': 0, 'active': 0, 'inactive': 0},
+            'keywords': {'total': 0, 'pending': 0, 'processing': 0, 'completed': 0, 'failed': 0},
+            'articles': {'total': 0}
+        }
+    
     try:
         projects = Project.query.all()
         total_projects = len(projects)
@@ -949,6 +974,14 @@ def api_dashboard_stats():
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
     """Get all projects with database fallback"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': True,
+            'projects': [],
+            'total': 0,
+            'message': 'Database not available - using fallback mode'
+        })
+    
     try:
         projects = Project.query.all()
         projects_data = [project.to_dict() for project in projects]
@@ -970,6 +1003,12 @@ def get_projects():
 @app.route('/api/projects', methods=['POST'])
 def create_project():
     """Create a new project with database fallback"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Database not available - cannot create projects'
+        }), 503
+        
     try:
         data = request.get_json()
         
@@ -1028,6 +1067,12 @@ def create_project():
 @app.route('/api/projects/<int:project_id>/keywords', methods=['POST'])
 def add_keywords_to_project(project_id):
     """Add keywords to a project"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Database not available - cannot add keywords'
+        }), 503
+        
     try:
         data = request.get_json()
         keywords = data.get('keywords', [])
@@ -1070,6 +1115,14 @@ def add_keywords_to_project(project_id):
 @app.route('/api/projects/<int:project_id>/keywords', methods=['GET'])
 def get_project_keywords(project_id):
     """Get keywords for a project"""
+    if not DB_AVAILABLE:
+        return jsonify({
+            'success': True,
+            'keywords': [],
+            'total': 0,
+            'message': 'Database not available - using fallback mode'
+        })
+        
     try:
         # Find the project
         project = Project.query.get(project_id)
