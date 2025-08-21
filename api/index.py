@@ -772,86 +772,127 @@ def dashboard():
                         <!-- Keywords List -->
                         <div x-show="showKeywords" class="mt-6">
                             <h3 class="text-lg font-medium text-gray-900 mb-4">Keywords Management</h3>
-                            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keyword</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Engine</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Processing By</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lease Until</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Processed</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <template x-for="keyword in currentProjectKeywords" :key="keyword.id">
-                                                <tr class="hover:bg-gray-50">
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="text-sm font-medium text-gray-900" x-text="keyword.keyword"></div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.search_engine || 'N/A'"></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.language || 'N/A'"></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.category_id || 'N/A'"></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span x-show="keyword.tags && keyword.tags.length > 0" x-text="keyword.tags.join(', ')"></span>
-                                                        <span x-show="!keyword.tags || keyword.tags.length === 0">N/A</span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <span :class="{
-                                                            'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
-                                                            'bg-blue-100 text-blue-800': keyword.status === 'processing',
-                                                            'bg-green-100 text-green-800': keyword.status === 'completed',
-                                                            'bg-red-100 text-red-800': keyword.status === 'failed',
-                                                            'bg-gray-100 text-gray-800': keyword.status === 'paused'
-                                                        }" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
-                                                            <span x-text="keyword.status"></span>
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <template x-for="keyword in currentProjectKeywords" :key="keyword.id">
+                                    <div class="bg-white shadow rounded-lg border hover:shadow-lg transition-shadow duration-200">
+                                        <!-- Keyword Header -->
+                                        <div class="px-6 py-4 border-b bg-gray-50">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <h4 class="text-lg font-semibold text-gray-900" x-text="keyword.keyword"></h4>
+                                                    <p class="text-sm text-gray-600 mt-1">
+                                                        <span x-text="keyword.search_engine || 'N/A'"></span> • 
+                                                        <span x-text="keyword.language || 'N/A'"></span>
+                                                    </p>
+                                                </div>
+                                                <span :class="{
+                                                    'bg-yellow-100 text-yellow-800': keyword.status === 'pending',
+                                                    'bg-blue-100 text-blue-800': keyword.status === 'processing',
+                                                    'bg-green-100 text-green-800': keyword.status === 'completed',
+                                                    'bg-red-100 text-red-800': keyword.status === 'failed',
+                                                    'bg-gray-100 text-gray-800': keyword.status === 'paused'
+                                                }" class="inline-flex px-3 py-1 text-xs font-semibold rounded-full">
+                                                    <span x-text="keyword.status"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Keyword Details -->
+                                        <div class="px-6 py-4">
+                                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    <span class="text-gray-500">Category:</span>
+                                                    <span class="font-medium text-gray-900" x-text="keyword.category_id || 'N/A'"></span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-gray-500">Priority:</span>
+                                                    <span class="font-medium text-gray-900" x-text="keyword.priority || 1"></span>
+                                                </div>
+                                                <div class="col-span-2">
+                                                    <span class="text-gray-500">Tags:</span>
+                                                    <div class="mt-1">
+                                                        <template x-for="tag in keyword.tags || []" :key="tag">
+                                                            <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1" x-text="tag"></span>
+                                                        </template>
+                                                        <span x-show="!keyword.tags || keyword.tags.length === 0" class="text-gray-400 text-xs">No tags</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Processing Info -->
+                                            <div x-show="keyword.processing_by || keyword.lease_until || keyword.error_message" class="mt-4 pt-4 border-t">
+                                                <div class="text-sm space-y-1">
+                                                    <div x-show="keyword.processing_by">
+                                                        <span class="text-gray-500">Processing by:</span>
+                                                        <span class="font-medium text-gray-900" x-text="keyword.processing_by"></span>
+                                                    </div>
+                                                    <div x-show="keyword.lease_until">
+                                                        <span class="text-gray-500">Lease until:</span>
+                                                        <span class="font-medium text-gray-900" x-text="new Date(keyword.lease_until).toLocaleString()"></span>
+                                                    </div>
+                                                    <div x-show="keyword.error_message">
+                                                        <span class="text-red-500">Error:</span>
+                                                        <span class="text-red-600 text-xs" x-text="keyword.error_message"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Timestamps -->
+                                            <div class="mt-4 pt-4 border-t">
+                                                <div class="grid grid-cols-2 gap-4 text-xs text-gray-500">
+                                                    <div>
+                                                        <span>Created:</span><br>
                                                         <span x-text="keyword.created_at ? new Date(keyword.created_at).toLocaleDateString() : 'N/A'"></span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="keyword.processing_by || 'N/A'"></td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span x-text="keyword.lease_until ? new Date(keyword.lease_until).toLocaleString() : 'N/A'"></span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span x-text="keyword.processed_at ? new Date(keyword.processed_at).toLocaleString() : 'N/A'"></span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">
-                                                        <span x-show="keyword.error_message" x-text="keyword.error_message.substring(0, 30) + '...'"></span>
-                                                        <span x-show="!keyword.error_message">-</span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <button x-show="keyword.status === 'pending'" 
-                                                                @click="createArticle(keyword)" 
-                                                                :disabled="creatingArticle === keyword.id"
-                                                                class="text-blue-600 hover:text-blue-900 mr-3 disabled:opacity-50">
-                                                            <span x-show="creatingArticle !== keyword.id">🚀 Create Article</span>
-                                                            <span x-show="creatingArticle === keyword.id">⏳ Creating...</span>
-                                                        </button>
-                                                        <button x-show="keyword.status === 'completed'" 
-                                                                @click="viewArticle(keyword)" 
-                                                                class="text-green-600 hover:text-green-900">
-                                                            📖 View Article
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                            <tr x-show="!currentProjectKeywords || currentProjectKeywords.length === 0">
-                                                <td colspan="12" class="px-6 py-4 text-center text-gray-500">
-                                                    No keywords added yet
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                                    </div>
+                                                    <div x-show="keyword.processed_at">
+                                                        <span>Processed:</span><br>
+                                                        <span x-text="new Date(keyword.processed_at).toLocaleDateString()"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Article Info -->
+                                            <div x-show="keyword.status === 'completed' && keyword.article_title" class="mt-4 p-3 bg-green-50 rounded-md">
+                                                <div class="text-sm">
+                                                    <div class="font-medium text-green-900" x-text="keyword.article_title"></div>
+                                                    <div class="text-green-700 text-xs mt-1">
+                                                        Content Score: <span x-text="keyword.content_score || 'N/A'"></span>
+                                                        <span x-show="keyword.wordpress_post_id"> • WP ID: <span x-text="keyword.wordpress_post_id"></span></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Actions -->
+                                        <div class="px-6 py-4 bg-gray-50 border-t">
+                                            <div class="flex space-x-2">
+                                                <button x-show="keyword.status === 'pending'" 
+                                                        @click="createArticle(keyword)" 
+                                                        :disabled="creatingArticle === keyword.id"
+                                                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50">
+                                                    <span x-show="creatingArticle !== keyword.id">🚀 Create Article</span>
+                                                    <span x-show="creatingArticle === keyword.id">⏳ Creating...</span>
+                                                </button>
+                                                <button x-show="keyword.status === 'completed'" 
+                                                        @click="viewArticle(keyword)" 
+                                                        class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                                    📖 View Article
+                                                </button>
+                                                <button x-show="keyword.status === 'failed'" 
+                                                        @click="createArticle(keyword)" 
+                                                        :disabled="creatingArticle === keyword.id"
+                                                        class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50">
+                                                    <span x-show="creatingArticle !== keyword.id">🔄 Retry</span>
+                                                    <span x-show="creatingArticle === keyword.id">⏳ Retrying...</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <!-- Empty State -->
+                                <div x-show="!currentProjectKeywords || currentProjectKeywords.length === 0" class="col-span-2 bg-white shadow rounded-lg p-8 text-center">
+                                    <p class="text-gray-500">No keywords added yet</p>
                                 </div>
                             </div>
                         </div>
