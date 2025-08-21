@@ -63,7 +63,16 @@ def neuron_new_query(project_id, keyword, engine, language):
         headers=headers,
         data=payload)
     
-    return response.json()
+    print(f"Neuron API Response Status: {response.status_code}")
+    print(f"Neuron API Response Text: {response.text[:500]}...")
+    
+    if response.status_code != 200:
+        raise Exception(f"Neuron API error: {response.status_code} - {response.text}")
+    
+    try:
+        return response.json()
+    except json.JSONDecodeError as e:
+        raise Exception(f"Invalid JSON response from Neuron API: {response.text[:200]}")
 
 def neuron_get_query(query_id):
     """Get query results from Neuron Writer"""
