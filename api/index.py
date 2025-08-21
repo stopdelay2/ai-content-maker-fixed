@@ -708,6 +708,7 @@ def dashboard():
                                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="">בחר מנוע חיפוש</option>
                                     <option value="google.com">Google.com (Global)</option>
+                                    <option value="google.co.il">Google.co.il (Israel)</option>
                                     <option value="google.co.uk">Google.co.uk (UK)</option>
                                     <option value="google.de">Google.de (Germany)</option>
                                     <option value="google.fr">Google.fr (France)</option>
@@ -716,7 +717,7 @@ def dashboard():
                                     <option value="google.com.au">Google.com.au (Australia)</option>
                                     <option value="google.ca">Google.ca (Canada)</option>
                                 </select>
-                                <p class="text-xs text-gray-500 mt-1">מנוע החיפוש לאנליזה (לדוגמא: google.co.uk)</p>
+                                <p class="text-xs text-gray-500 mt-1">מנוע החיפוש לאנליזה (לדוגמא: google.co.il)</p>
                             </div>
                             
                             <div class="mb-4">
