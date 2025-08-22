@@ -871,23 +871,23 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
         print(f"🔍 Generated description: '{main_article_description}'")
 
-        print("🔍 DEBUGGING: Before generating article content")
-        print(f"🔍 Generated title so far: '{main_article_title}'")
-        print(f"🔍 Generated description so far: '{main_article_description}'")
+        print("🛑 STOPPING AFTER TITLE AND DESCRIPTION GENERATION")
+        print(f"📝 FINAL TITLE: '{main_article_title}'")
+        print(f"📝 FINAL DESCRIPTION: '{main_article_description}'")
+        print("🛑 NO FURTHER PROCESSING - JUST RETURN THE RESULTS")
         
-        # Stop here to debug - return before article generation to focus on title/description issue
-        return_dict = {
-            "main_article_title": main_article_title,
-            "main_article_description": main_article_description,
-            "main_article_content": "DEBUGGING: Stopped before article generation",
-            "import_content_response": {"content_score": 75},
-            "h1_terms_string": "DEBUG H1",
-            "h2_terms_string": "DEBUG H2", 
-            "main_search_keyword_terms": main_search_keyword_terms,
-            "main_query_id": main_query_id,
-            "neuron_query_response_data": neuron_query_response_data
+        # Return only the basic results - no article content, no optimization, no upload
+        response_data = {
+            'success': True,
+            'message': 'Title and Description generated successfully (DEBUG MODE).',
+            'title': main_article_title,
+            'meta_description': main_article_description,
+            'article_content': 'DEBUG: Only title and description generated',
+            'content_score': 0
         }
-        return return_dict
+        
+        print(f"🔍 RETURNING TO MAIN FUNCTION: {response_data}")
+        return response_data, 200
         # create article with GPT
         main_h1_terms = neuron_query_response_data['terms']["h1"]
         main_h2_terms = neuron_query_response_data['terms']["h2"]
