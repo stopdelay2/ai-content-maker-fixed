@@ -307,7 +307,7 @@ def gpt_generate_title(model, terms, keywords):
         test_response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": test_prompt}],
-            max_completion_tokens=50
+            max_completion_tokens=20000
         )
         if test_response and test_response.choices:
             test_result = test_response.choices[0].message.content
@@ -331,7 +331,7 @@ def gpt_generate_title(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            max_completion_tokens=200
+            max_completion_tokens=2000
         )
         
         print(f"🔍 GPT Response received successfully")
@@ -389,7 +389,7 @@ def gpt_generate_description(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            max_completion_tokens=200
+            max_completion_tokens=2000
         )
         
         print(f"🔍 GPT Description Response received successfully")
@@ -1236,7 +1236,7 @@ def test_gpt():
         response = client.chat.completions.create(
             model=openai_model,
             messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=200
+            max_completion_tokens=2000
         )
         
         if response and response.choices and len(response.choices) > 0:
