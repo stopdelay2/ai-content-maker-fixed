@@ -295,8 +295,28 @@ def gpt_generate_title(model, terms, keywords):
     print(f"🔍 DEBUG: Formatted terms: {terms_formatted}")
     print(f"🔍 DEBUG: Keywords for prompt: {keywords}")
     
+    # TEST: Simple prompt first to check if GPT works at all
+    test_prompt = "Write just the word 'TEST' and nothing else."
+    print(f"🧪 TESTING: First trying simple test prompt...")
+    
+    try:
+        test_response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": test_prompt}],
+            max_completion_tokens=10
+        )
+        if test_response and test_response.choices:
+            test_result = test_response.choices[0].message.content
+            print(f"🧪 TEST RESULT: '{test_result}'")
+        else:
+            print("❌ Test failed - no response")
+            
+    except Exception as test_e:
+        print(f"❌ Test failed with error: {test_e}")
+    
+    # Now try the real prompt
     prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
-    print(f"🔍 DEBUG: Prompt ready, calling GPT-5...")
+    print(f"🔍 DEBUG: Now trying real prompt...")
     
     try:
         response = client.chat.completions.create(
