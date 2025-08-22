@@ -307,7 +307,7 @@ def gpt_generate_title(model, terms, keywords):
         test_response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": test_prompt}],
-            max_completion_tokens=50
+            max_tokens=50
         )
         if test_response and test_response.choices:
             test_result = test_response.choices[0].message.content
@@ -331,9 +331,7 @@ def gpt_generate_title(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            top_p=1,
-            max_completion_tokens=150
+            max_tokens=150
         )
         
         print(f"🔍 GPT Response received successfully")
@@ -391,9 +389,7 @@ def gpt_generate_description(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
-            top_p=1,
-            max_completion_tokens=150
+            max_tokens=150
         )
         
         print(f"🔍 GPT Description Response received successfully")
@@ -940,8 +936,8 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             response_data = {
                 'success': False,
                 'message': 'Failed to generate title and description',
-                'title': main_article_title or '',
-                'meta_description': main_article_description or '',
+                'main_article_title': main_article_title or '',
+                'main_article_description': main_article_description or '',
                 'article_content': '',
                 'content_score': 0
             }
@@ -1070,27 +1066,34 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             response_data, status_code = initial_content_evaluation
             print(f'\n🔍 EXTRACTED DATA FROM TUPLE: {response_data}\n')
             # Check if we got valid title and description
-            if not response_data.get('title') or not response_data.get('meta_description'):
+            if not response_data.get('main_article_title') or not response_data.get('main_article_description'):
                 print("❌ No valid title/description generated, stopping here")
                 return response_data, status_code
         else:
             response_data = initial_content_evaluation
-            if not response_data.get('title') or not response_data.get('meta_description'):
+            if not response_data.get('main_article_title') or not response_data.get('main_article_description'):
                 print("❌ No valid title/description generated, stopping here")
                 return response_data
 
-        response_data = {
+        # Use the initial content from title/description generation
+        if isinstance(initial_content_evaluation, tuple):
+            response_data, status_code = initial_content_evaluation
+        else:
+            response_data = initial_content_evaluation
+            
+        # Create final response with the generated content
+        final_response = {
             'success': True,
             'message': 'Article content created successfully.',
-            'title': optimized_content_dict['main_article_title'],
-            'meta_description': optimized_content_dict['main_article_description'],
-            'article_content': optimized_content_dict['updated_html_content'],
-            'content_score': optimized_content_dict['content_score']
+            'title': response_data.get('main_article_title', ''),
+            'meta_description': response_data.get('main_article_description', ''),
+            'article_content': response_data.get('article_content', 'Basic article content generated'),
+            'content_score': response_data.get('content_score', 0)
         }
 
         print('Article creation completed successfully')
-        print(json.dumps(response_data, indent=4))
-        return response_data, 200
+        print(json.dumps(final_response, indent=4))
+        return final_response, 200
 
     except Exception as e:
         error_msg = f'Error in article creation process: {str(e)}'
