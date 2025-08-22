@@ -837,7 +837,7 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             'main_article_title': main_article_title,
             'main_article_description': main_article_description,
             'updated_html_content': updated_html_content,
-            'content_score': int(new_evaluate_content_response['content_score'] if new_evaluate_content_response else current_score)
+            'content_score': int(current_score)
         }
         return return_dict
 
