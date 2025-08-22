@@ -307,7 +307,7 @@ def gpt_generate_title(model, terms, keywords):
         test_response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": test_prompt}],
-            max_tokens=50
+            max_completion_tokens=50
         )
         if test_response and test_response.choices:
             test_result = test_response.choices[0].message.content
@@ -331,7 +331,7 @@ def gpt_generate_title(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150
+            max_completion_tokens=200
         )
         
         print(f"🔍 GPT Response received successfully")
@@ -352,16 +352,16 @@ def gpt_generate_title(model, terms, keywords):
             if not result:
                 print(f"⚠️ GPT returned empty content. Full message: {msg}")
                 print(f"⚠️ Choice details: finish_reason={getattr(choice, 'finish_reason', 'unknown')}")
-                result = ""
+                return None  # Return None instead of empty string
             else:
                 print(f"✅ GPT Title Result: '{result}' (length: {len(result)})")
-            return result
+                return result
         else:
             print("❌ Invalid response structure from GPT")
-            return "Error: Invalid response"
+            return None  # Return None instead of error string
     except Exception as e:
         print(f"❌ Exception in GPT title generation: {str(e)}")
-        return f"Error: {str(e)}"
+        return None  # Return None instead of error string
 
 def gpt_generate_description(model, terms, keywords):
     """Generate meta description using OpenAI"""
@@ -389,7 +389,7 @@ def gpt_generate_description(model, terms, keywords):
                 {"role": "system", "content": "You are an expert SEO writer."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150
+            max_completion_tokens=200
         )
         
         print(f"🔍 GPT Description Response received successfully")
@@ -409,16 +409,16 @@ def gpt_generate_description(model, terms, keywords):
             if not result:
                 print(f"⚠️ GPT returned empty description. Full message: {msg}")
                 print(f"⚠️ Choice details: finish_reason={getattr(choice, 'finish_reason', 'unknown')}")
-                result = ""
+                return None  # Return None instead of empty string
             else:
                 print(f"✅ GPT Description Result: '{result}' (length: {len(result)})")
-            return result
+                return result
         else:
             print("❌ Invalid description response structure from GPT")
-            return "Error: Invalid response"
+            return None  # Return None instead of error string
     except Exception as e:
         print(f"❌ Exception in GPT description generation: {str(e)}")
-        return f"Error: {str(e)}"
+        return None  # Return None instead of error string
 
 def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
     """Generate article content using OpenAI"""
