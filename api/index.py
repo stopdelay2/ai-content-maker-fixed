@@ -1003,9 +1003,17 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         initial_content_evaluation = neuron_create_title_desc_article(neuron_response_dict)
         print(f'\n🔍 RECEIVED FROM TITLE/DESC FUNCTION: {initial_content_evaluation}\n')
 
-        # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
-        print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
-        return initial_content_evaluation
+        # Handle tuple response from neuron function
+        if isinstance(initial_content_evaluation, tuple):
+            response_data, status_code = initial_content_evaluation
+            print(f'\n🔍 EXTRACTED DATA FROM TUPLE: {response_data}\n')
+            # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
+            print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
+            return response_data, status_code
+        else:
+            # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
+            print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
+            return initial_content_evaluation
 
         response_data = {
             'success': True,
