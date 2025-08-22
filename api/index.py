@@ -744,11 +744,16 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
 
         # create title with GPT
         main_title_terms = neuron_query_response_data['terms']['title']
+        print(f"🔍 Title terms from Neuron: {main_title_terms}")
+        print(f"🔍 Search keywords: {main_search_keyword_terms}")
         main_article_title = gpt_generate_title(openai_model, main_title_terms, main_search_keyword_terms)
+        print(f"🔍 Generated title: '{main_article_title}'")
 
         # create meta-description with GPT
         main_description_terms = neuron_query_response_data['terms']["desc"]
+        print(f"🔍 Description terms from Neuron: {main_description_terms}")
         main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
+        print(f"🔍 Generated description: '{main_article_description}'")
 
         # create article with GPT
         main_h1_terms = neuron_query_response_data['terms']["h1"]
