@@ -903,7 +903,6 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             "neuron_query_response_data": neuron_query_response_data
         }
         return return_dict
-        """
 
     #################################################################
     # content optimization process
