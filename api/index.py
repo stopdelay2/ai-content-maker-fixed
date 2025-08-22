@@ -40,12 +40,11 @@ anchors_config_path = os.getenv('ANCHORS_CONFIG_PATH')
 
 # Essential Neuron Writer functions
 def neuron_new_query(project_id, keyword, engine, language):
-    """Create a new query in Neuron Writer - DEMO VERSION"""
+    """Create a new query in Neuron Writer"""
     import json
     
-    # TODO: Remove this demo data and restore real API call after development is complete
-    # Original API call commented out to save API quota during development
-    """
+    print(f"🧠 NEURON API: Creating query for keyword '{keyword}' in {language}")
+    
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json", 
@@ -54,65 +53,14 @@ def neuron_new_query(project_id, keyword, engine, language):
     payload = json.dumps({"project": project_id, "keyword": keyword, "engine": engine, "language": language})
     response = requests.request("POST", neuron_api_endpoint + "/new-query", headers=headers, data=payload)
     return response.json()
-    """
-    
-    # Demo response based on typical Neuron Writer API structure
-    demo_response = {
-        "query": "demo_query_12345",
-        "status": "created",
-        "message": "Query created successfully (DEMO MODE)"
-    }
-    
-    print(f"🧪 DEMO MODE: Created query for keyword '{keyword}' in {language}")
-    return demo_response
 
 def neuron_get_query(query_id):
     """Get query results from Neuron Writer"""
     import json
     import requests
     
-    # DEMO MODE - Remove this block and uncomment real API call below when ready for production
-    demo_response = {
-        "status": "ready",
-        "query": query_id,
-        "terms": {
-            "title": [
-                {"term": "אלי אקספרס", "score": 95},
-                {"term": "קופונים", "score": 90},
-                {"term": "הנחות", "score": 85}
-            ],
-            "desc": [
-                {"term": "חיסכון", "score": 88},
-                {"term": "מבצעים", "score": 85},
-                {"term": "קניות אונליין", "score": 82}
-            ],
-            "h1": [
-                {"term": "מדריך קופונים", "score": 92},
-                {"term": "איך לחסוך", "score": 88},
-                {"term": "קניות חכמות", "score": 85}
-            ],
-            "h2": [
-                {"term": "קודי הנחה", "score": 90},
-                {"term": "טיפים לקניות", "score": 87},
-                {"term": "מוצרים מומלצים", "score": 83}
-            ],
-            "content_basic": [
-                {"term": "אלי אקספרס", "usage": 3},
-                {"term": "קופון", "usage": 5},
-                {"term": "הנחה", "usage": 4}
-            ],
-            "content_extended": [
-                {"term": "קניות", "usage": 2},
-                {"term": "מחיר", "usage": 3},
-                {"term": "משלוח", "usage": 2}
-            ]
-        }
-    }
-    print(f"🧪 DEMO MODE: Retrieved query results for {query_id}")
-    return demo_response
+    print(f"🧠 NEURON API: Getting query results for {query_id}")
     
-    # REAL API CALL - Uncomment this section for production use:
-    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -128,24 +76,14 @@ def neuron_get_query(query_id):
         data=payload)
     
     return response.json()
-    """
 
 def neuron_import_content(query_id, content, title, description):
     """Import content to Neuron Writer"""
     import json
     import requests
     
-    # DEMO MODE - Remove this block for production use
-    demo_response = {
-        "content_score": 75,
-        "message": "Content imported successfully (DEMO MODE)",
-        "status": "success"
-    }
-    print(f"🧪 DEMO MODE: Imported content with title '{title}' - Score: {demo_response['content_score']}")
-    return demo_response
+    print(f"🧠 NEURON API: Importing content with title '{title[:50]}...'")
     
-    # REAL API CALL - Uncomment for production:
-    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -166,24 +104,14 @@ def neuron_import_content(query_id, content, title, description):
         data=payload)
     
     return response.json()
-    """
 
 def neuron_evaluate_content(query_id, content, title, description):
     """Evaluate content in Neuron Writer"""
     import json
     import requests
     
-    # DEMO MODE - Remove this block for production use
-    demo_response = {
-        "content_score": 82,
-        "message": "Content evaluated successfully (DEMO MODE)",
-        "status": "success"
-    }
-    print(f"🧪 DEMO MODE: Evaluated content - Score: {demo_response['content_score']}")
-    return demo_response
+    print(f"🧠 NEURON API: Evaluating content for query {query_id}")
     
-    # REAL API CALL - Uncomment for production:
-    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -204,7 +132,6 @@ def neuron_evaluate_content(query_id, content, title, description):
         data=payload)
     
     return response.json()
-    """
 
 # Embedded prompts (from prompts.yaml)
 TITLE_CREATION_PROMPT = """Task:
@@ -965,9 +892,13 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         import_content_response = neuron_import_content(main_query_id, main_article_content, main_article_title, main_article_description)
 
         return_dict = {
-            "main_article_title": main_article_title,
-            "main_article_description": main_article_description,
-            "main_article_content": main_article_content,
+            'success': True,
+            'message': 'Article created successfully with full content',
+            'main_article_title': main_article_title,
+            'main_article_description': main_article_description,
+            'article_content': main_article_content,
+            'content_score': import_content_response.get('score', 0) if isinstance(import_content_response, dict) else 0,
+            # Keep additional data for potential optimization
             "import_content_response": import_content_response,
             "h1_terms_string": h1_terms_string,
             "h2_terms_string": h2_terms_string,
@@ -975,7 +906,7 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             "main_query_id": main_query_id,
             "neuron_query_response_data": neuron_query_response_data
         }
-        return return_dict
+        return return_dict, 200
 
     #################################################################
     # content optimization process
