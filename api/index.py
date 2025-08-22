@@ -1120,6 +1120,50 @@ def test_wordpress_connection(site_url, username, app_password):
             'error': f'שגיאה כללית: {str(e)}'
         }
 
+@app.route('/api/test-gpt', methods=['POST'])
+def test_gpt():
+    """Test GPT with custom prompt"""
+    try:
+        data = request.get_json()
+        prompt = data.get('prompt', 'Hello, please respond with "Test successful"')
+        
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_key)
+        
+        print(f"🧪 Testing GPT with prompt: {prompt}")
+        
+        response = client.chat.completions.create(
+            model=openai_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=200
+        )
+        
+        if response and response.choices and len(response.choices) > 0:
+            result = response.choices[0].message.content
+            print(f"🧪 GPT Response: '{result}'")
+            
+            return jsonify({
+                'success': True,
+                'prompt': prompt,
+                'response': result,
+                'model': openai_model,
+                'response_length': len(result) if result else 0
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No response from GPT',
+                'prompt': prompt
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ GPT Test Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'prompt': data.get('prompt', '') if 'data' in locals() else ''
+        }), 500
+
 @app.route('/')
 def dashboard():
     """Render the full dashboard"""
@@ -1142,6 +1186,10 @@ def dashboard():
                         <h1 class="text-2xl font-bold text-gray-900">🤖 AI Content Maker</h1>
                     </div>
                     <div class="flex items-center space-x-4">
+                        <button @click="showGptTest = true" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            🧪 Test GPT
+                        </button>
                         <button @click="showCreateProject = true" 
                                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
                             + New Project
@@ -1757,6 +1805,71 @@ def dashboard():
             </div>
         </div>
 
+        <!-- GPT Test Modal -->
+        <div x-show="showGptTest" x-cloak 
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">🧪 Test GPT Connection</h3>
+                    
+                    <!-- Input Form -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Enter your prompt:
+                        </label>
+                        <textarea 
+                            x-model="gptTestPrompt"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                            rows="4" 
+                            placeholder="Enter your prompt here... (e.g., 'Write a short greeting in Hebrew')">
+                        </textarea>
+                    </div>
+                    
+                    <!-- Test Button -->
+                    <div class="mb-4">
+                        <button @click="testGpt()" 
+                                :disabled="gptTesting"
+                                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md text-sm font-medium">
+                            <span x-show="!gptTesting">🚀 Test GPT</span>
+                            <span x-show="gptTesting">🔄 Testing...</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Results -->
+                    <div x-show="gptTestResult" class="mb-4">
+                        <div x-show="gptTestResult && gptTestResult.success" class="border border-green-300 bg-green-50 p-4 rounded-md">
+                            <h4 class="font-medium text-green-800 mb-2">✅ Success!</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <strong>Model:</strong> <span x-text="gptTestResult.model"></span> |
+                                <strong>Response Length:</strong> <span x-text="gptTestResult.response_length"></span> chars
+                            </div>
+                            <div class="bg-white p-3 rounded border">
+                                <strong class="text-gray-700">GPT Response:</strong>
+                                <div class="mt-1 whitespace-pre-wrap" x-text="gptTestResult.response"></div>
+                            </div>
+                        </div>
+                        
+                        <div x-show="gptTestResult && !gptTestResult.success" class="border border-red-300 bg-red-50 p-4 rounded-md">
+                            <h4 class="font-medium text-red-800 mb-2">❌ Error</h4>
+                            <div class="text-sm text-red-700" x-text="gptTestResult.error"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" @click="showGptTest = false; resetGptTest()" 
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
+                            Close
+                        </button>
+                        <button type="button" @click="resetGptTest()" 
+                                class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Create Project Modal -->
         <div x-show="showCreateProject" x-cloak 
              class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -1905,7 +2018,11 @@ def dashboard():
                 stats: {},
                 recentActivity: { articles: [], keywords: [] },
                 showCreateProject: false,
+                showGptTest: false,
                 creating: false,
+                gptTesting: false,
+                gptTestPrompt: '',
+                gptTestResult: null,
                 newProject: {
                     name: '',
                     website_url: '',
@@ -2315,6 +2432,44 @@ def dashboard():
                         alert('❌ Error loading article');
                         this.currentView = 'project'; // Go back
                     }
+                },
+
+                async testGpt() {
+                    if (!this.gptTestPrompt.trim()) {
+                        alert('Please enter a prompt');
+                        return;
+                    }
+
+                    this.gptTesting = true;
+                    this.gptTestResult = null;
+
+                    try {
+                        const response = await fetch('/api/test-gpt', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: this.gptTestPrompt })
+                        });
+
+                        const data = await response.json();
+                        this.gptTestResult = data;
+
+                        if (!data.success) {
+                            alert(`❌ GPT Error: ${data.error}`);
+                        }
+                    } catch (error) {
+                        console.error('GPT Test Error:', error);
+                        this.gptTestResult = {
+                            success: false,
+                            error: 'Network error: ' + error.message
+                        };
+                    } finally {
+                        this.gptTesting = false;
+                    }
+                },
+
+                resetGptTest() {
+                    this.gptTestPrompt = '';
+                    this.gptTestResult = null;
                 }
             }
         }
