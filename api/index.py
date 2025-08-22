@@ -214,6 +214,7 @@ def gpt_generate_title(model, terms, keywords):
     client = OpenAI(api_key=openai_key)
     
     prompt = f"Generate a compelling title in Hebrew for an article about '{keywords}' using these terms: {terms}"
+    print(f"🔍 GPT Title Prompt: {prompt}")
     
     response = client.chat.completions.create(
         model=model,
@@ -221,7 +222,9 @@ def gpt_generate_title(model, terms, keywords):
         max_completion_tokens=100
     )
     
-    return response.choices[0].message.content.strip()
+    result = response.choices[0].message.content.strip()
+    print(f"🔍 GPT Title Result: {result}")
+    return result
 
 def gpt_generate_description(model, terms, keywords):
     """Generate meta description using OpenAI"""
@@ -230,6 +233,7 @@ def gpt_generate_description(model, terms, keywords):
     client = OpenAI(api_key=openai_key)
     
     prompt = f"Generate a meta description in Hebrew (max 160 chars) for an article about '{keywords}' using these terms: {terms}"
+    print(f"🔍 GPT Description Prompt: {prompt}")
     
     response = client.chat.completions.create(
         model=model,
@@ -237,7 +241,9 @@ def gpt_generate_description(model, terms, keywords):
         max_completion_tokens=100
     )
     
-    return response.choices[0].message.content.strip()
+    result = response.choices[0].message.content.strip()
+    print(f"🔍 GPT Description Result: {result}")
+    return result
 
 def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
     """Generate article content using OpenAI"""
@@ -253,13 +259,18 @@ def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
     
     Please create a well-structured HTML article with proper headings and paragraphs."""
     
+    print(f"🔍 GPT Article Prompt: {prompt[:500]}...")
+    
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         max_completion_tokens=2000
     )
     
-    return response.choices[0].message.content.strip()
+    result = response.choices[0].message.content.strip()
+    print(f"🔍 GPT Article Result Length: {len(result)} chars")
+    print(f"🔍 GPT Article Result Preview: {result[:200]}...")
+    return result
 
 # Essential utility functions
 def sentence_to_multiline(sentence):
