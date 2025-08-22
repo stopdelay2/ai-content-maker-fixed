@@ -296,13 +296,7 @@ def gpt_generate_title(model, terms, keywords):
     print(f"🔍 DEBUG: Keywords for prompt: {keywords}")
     
     prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
-    print(f"🔍 DEBUG: FULL PROMPT BEING SENT TO GPT:")
-    print(prompt)
-    print(f"🔍 DEBUG: End of prompt")
-    
-    # Stop here to see the exact prompt before sending to GPT
-    print("🛑 STOPPING BEFORE GPT CALL - Check the prompt above")
-    return "DEBUG: Stopped before GPT call"
+    print(f"🔍 DEBUG: Prompt ready, calling GPT-5...")
     
     try:
         response = client.chat.completions.create(
@@ -311,14 +305,21 @@ def gpt_generate_title(model, terms, keywords):
             max_completion_tokens=100
         )
         
-        print(f"🔍 GPT Response: {response}")
-        result = response.choices[0].message.content
-        print(f"🔍 GPT Title Result Raw: '{result}'")
-        result = result.strip() if result else ""
-        print(f"🔍 GPT Title Result Stripped: '{result}'")
-        return result
+        print(f"🔍 GPT Response received successfully")
+        if response and response.choices and len(response.choices) > 0:
+            result = response.choices[0].message.content
+            if result is None:
+                print("⚠️ GPT returned None content")
+                result = ""
+            else:
+                result = result.strip()
+                print(f"✅ GPT Title Result: '{result}' (length: {len(result)})")
+            return result
+        else:
+            print("❌ Invalid response structure from GPT")
+            return "Error: Invalid response"
     except Exception as e:
-        print(f"❌ Error in GPT title generation: {e}")
+        print(f"❌ Exception in GPT title generation: {str(e)}")
         return f"Error: {str(e)}"
 
 def gpt_generate_description(model, terms, keywords):
@@ -336,15 +337,29 @@ def gpt_generate_description(model, terms, keywords):
     prompt = DESCRIPTION_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
     print(f"🔍 GPT Description Prompt: {prompt[:300]}...")
     
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=100
-    )
-    
-    result = response.choices[0].message.content.strip()
-    print(f"🔍 GPT Description Result: '{result}'")
-    return result
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=100
+        )
+        
+        print(f"🔍 GPT Description Response received successfully")
+        if response and response.choices and len(response.choices) > 0:
+            result = response.choices[0].message.content
+            if result is None:
+                print("⚠️ GPT returned None content for description")
+                result = ""
+            else:
+                result = result.strip()
+                print(f"✅ GPT Description Result: '{result}' (length: {len(result)})")
+            return result
+        else:
+            print("❌ Invalid description response structure from GPT")
+            return "Error: Invalid response"
+    except Exception as e:
+        print(f"❌ Exception in GPT description generation: {str(e)}")
+        return f"Error: {str(e)}"
 
 def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
     """Generate article content using OpenAI"""
