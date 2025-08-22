@@ -755,6 +755,23 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
         print(f"🔍 Generated description: '{main_article_description}'")
 
+        # TEMPORARY: Stop here for testing title and description generation
+        print("🛑 STOPPING HERE FOR TESTING - Title and Description generated")
+        return_dict = {
+            "main_article_title": main_article_title,
+            "main_article_description": main_article_description,
+            "main_article_content": "TEST CONTENT - Article generation stopped for testing",
+            "import_content_response": {"content_score": 75},
+            "h1_terms_string": "TEST H1",
+            "h2_terms_string": "TEST H2", 
+            "main_search_keyword_terms": main_search_keyword_terms,
+            "main_query_id": main_query_id,
+            "neuron_query_response_data": neuron_query_response_data
+        }
+        return return_dict
+        
+        # ORIGINAL CODE BELOW - Will be restored after testing:
+        """
         # create article with GPT
         main_h1_terms = neuron_query_response_data['terms']["h1"]
         main_h2_terms = neuron_query_response_data['terms']["h2"]
@@ -785,6 +802,7 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             "neuron_query_response_data": neuron_query_response_data
         }
         return return_dict
+        """
 
     #################################################################
     # content optimization process
