@@ -293,7 +293,11 @@ def gpt_generate_title(model, terms, keywords):
         terms_formatted = str(terms)
     
     print(f"🔍 DEBUG: Formatted terms: {terms_formatted}")
-    print(f"🔍 DEBUG: Keywords for prompt: {keywords}")
+    print(f"🔍 DEBUG: Raw keywords: '{keywords}'")
+    
+    # Clean keywords - remove newlines and extra spaces
+    keywords_cleaned = ' '.join(str(keywords).split()) if keywords else ''
+    print(f"🔍 DEBUG: Cleaned keywords: '{keywords_cleaned}'")
     
     # TEST: Simple prompt first to check if GPT works at all
     test_prompt = "Write just the word 'TEST' and nothing else."
@@ -314,9 +318,11 @@ def gpt_generate_title(model, terms, keywords):
     except Exception as test_e:
         print(f"❌ Test failed with error: {test_e}")
     
-    # Now try the real prompt
-    prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
+    # Now try the real prompt with cleaned keywords
+    prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords_cleaned)
     print(f"🔍 DEBUG: Now trying real prompt...")
+    print(f"🔍 DEBUG: Prompt length: {len(prompt)} characters")
+    print(f"🔍 DEBUG: First 200 chars of prompt: {prompt[:200]}...")
     
     try:
         response = client.chat.completions.create(
@@ -354,7 +360,11 @@ def gpt_generate_description(model, terms, keywords):
     else:
         terms_formatted = str(terms)
     
-    prompt = DESCRIPTION_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
+    # Clean keywords - remove newlines and extra spaces
+    keywords_cleaned = ' '.join(str(keywords).split()) if keywords else ''
+    print(f"🔍 DEBUG Description - Raw keywords: '{keywords}' -> Cleaned: '{keywords_cleaned}'")
+    
+    prompt = DESCRIPTION_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords_cleaned)
     print(f"🔍 GPT Description Prompt: {prompt[:300]}...")
     
     try:
@@ -891,23 +901,22 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
         print(f"🔍 Generated description: '{main_article_description}'")
 
-        print("🛑 STOPPING AFTER TITLE AND DESCRIPTION GENERATION")
-        print(f"📝 FINAL TITLE: '{main_article_title}'")
-        print(f"📝 FINAL DESCRIPTION: '{main_article_description}'")
-        print("🛑 NO FURTHER PROCESSING - JUST RETURN THE RESULTS")
+        # Check if we got valid content before continuing
+        if not main_article_title or not main_article_description:
+            print("❌ Empty title or description from GPT, cannot continue")
+            response_data = {
+                'success': False,
+                'message': 'Failed to generate title and description',
+                'title': main_article_title or '',
+                'meta_description': main_article_description or '',
+                'article_content': '',
+                'content_score': 0
+            }
+            return response_data, 500
         
-        # Return only the basic results - no article content, no optimization, no upload
-        response_data = {
-            'success': True,
-            'message': 'Title and Description generated successfully (DEBUG MODE).',
-            'title': main_article_title,
-            'meta_description': main_article_description,
-            'article_content': 'DEBUG: Only title and description generated',
-            'content_score': 0
-        }
-        
-        print(f"🔍 RETURNING TO MAIN FUNCTION: {response_data}")
-        return response_data, 200
+        print(f"✅ Valid title and description generated, continuing with article creation...")
+        print(f"📝 TITLE: '{main_article_title}'")
+        print(f"📝 DESCRIPTION: '{main_article_description}'")
         # create article with GPT
         main_h1_terms = neuron_query_response_data['terms']["h1"]
         main_h2_terms = neuron_query_response_data['terms']["h2"]
@@ -1023,17 +1032,19 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         initial_content_evaluation = neuron_create_title_desc_article(neuron_response_dict)
         print(f'\n🔍 RECEIVED FROM TITLE/DESC FUNCTION: {initial_content_evaluation}\n')
 
-        # Handle tuple response from neuron function
+        # Handle tuple response from neuron function - CONTINUE PROCESSING
         if isinstance(initial_content_evaluation, tuple):
             response_data, status_code = initial_content_evaluation
             print(f'\n🔍 EXTRACTED DATA FROM TUPLE: {response_data}\n')
-            # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
-            print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
-            return response_data, status_code
+            # Check if we got valid title and description
+            if not response_data.get('title') or not response_data.get('meta_description'):
+                print("❌ No valid title/description generated, stopping here")
+                return response_data, status_code
         else:
-            # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
-            print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
-            return initial_content_evaluation
+            response_data = initial_content_evaluation
+            if not response_data.get('title') or not response_data.get('meta_description'):
+                print("❌ No valid title/description generated, stopping here")
+                return response_data
 
         response_data = {
             'success': True,
