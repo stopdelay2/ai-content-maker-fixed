@@ -1001,10 +1001,11 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
 
         # create: title, meta-description, article content
         initial_content_evaluation = neuron_create_title_desc_article(neuron_response_dict)
-        print(f'\n{initial_content_evaluation}\n')
+        print(f'\n🔍 RECEIVED FROM TITLE/DESC FUNCTION: {initial_content_evaluation}\n')
 
-        # content optimization
-        optimized_content_dict = content_optimization_process(initial_content_evaluation, site)
+        # 🛑 STOP HERE - RETURN IMMEDIATELY AFTER TITLE/DESCRIPTION GENERATION
+        print("🛑 STOPPING IN MAIN FUNCTION - NO FURTHER PROCESSING")
+        return initial_content_evaluation
 
         response_data = {
             'success': True,
