@@ -307,7 +307,7 @@ def gpt_generate_title(model, terms, keywords):
         test_response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": test_prompt}],
-            max_completion_tokens=10
+            max_completion_tokens=50
         )
         if test_response and test_response.choices:
             test_result = test_response.choices[0].message.content
@@ -327,18 +327,35 @@ def gpt_generate_title(model, terms, keywords):
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=100
+            messages=[
+                {"role": "system", "content": "You are an expert SEO writer."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            top_p=1,
+            max_completion_tokens=150
         )
         
         print(f"🔍 GPT Response received successfully")
+        
+        # Log raw response for debugging
+        if not (response and response.choices and len(response.choices) > 0 and response.choices[0].message.content):
+            print(f"❌ EMPTY/INVALID GPT RESPONSE - RAW: {response}")
+        
         if response and response.choices and len(response.choices) > 0:
-            result = response.choices[0].message.content
-            if result is None:
-                print("⚠️ GPT returned None content")
+            choice = response.choices[0]
+            msg = choice.message
+            result = getattr(msg, "content", None) or getattr(msg, "refusal", None) or ""
+            
+            # Clean result of hidden characters that might cause issues
+            if result:
+                result = result.replace("\u200f","").replace("\u200e","").strip()
+            
+            if not result:
+                print(f"⚠️ GPT returned empty content. Full message: {msg}")
+                print(f"⚠️ Choice details: finish_reason={getattr(choice, 'finish_reason', 'unknown')}")
                 result = ""
             else:
-                result = result.strip()
                 print(f"✅ GPT Title Result: '{result}' (length: {len(result)})")
             return result
         else:
@@ -370,18 +387,34 @@ def gpt_generate_description(model, terms, keywords):
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=100
+            messages=[
+                {"role": "system", "content": "You are an expert SEO writer."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            top_p=1,
+            max_completion_tokens=150
         )
         
         print(f"🔍 GPT Description Response received successfully")
+        # Log raw response for debugging
+        if not (response and response.choices and len(response.choices) > 0 and response.choices[0].message.content):
+            print(f"❌ EMPTY/INVALID GPT DESCRIPTION RESPONSE - RAW: {response}")
+        
         if response and response.choices and len(response.choices) > 0:
-            result = response.choices[0].message.content
-            if result is None:
-                print("⚠️ GPT returned None content for description")
+            choice = response.choices[0]
+            msg = choice.message
+            result = getattr(msg, "content", None) or getattr(msg, "refusal", None) or ""
+            
+            # Clean result of hidden characters
+            if result:
+                result = result.replace("\u200f","").replace("\u200e","").strip()
+            
+            if not result:
+                print(f"⚠️ GPT returned empty description. Full message: {msg}")
+                print(f"⚠️ Choice details: finish_reason={getattr(choice, 'finish_reason', 'unknown')}")
                 result = ""
             else:
-                result = result.strip()
                 print(f"✅ GPT Description Result: '{result}' (length: {len(result)})")
             return result
         else:
@@ -1131,6 +1164,60 @@ def test_wordpress_connection(site_url, username, app_password):
             'error': f'שגיאה כללית: {str(e)}'
         }
 
+@app.route('/api/get-sample-prompts', methods=['GET'])
+def get_sample_prompts():
+    """Get sample prompts for testing"""
+    try:
+        # Sample demo data
+        demo_terms = [
+            {'term': 'אלי אקספרס', 'score': 95},
+            {'term': 'קופונים', 'score': 90}, 
+            {'term': 'הנחות', 'score': 85}
+        ]
+        demo_keywords = 'עליאקספרס קופונים'
+        
+        # Format terms like in the real function
+        terms_formatted = "\n".join([f"{term['term']}: {term['score']}%" for term in demo_terms])
+        
+        # Create the real prompts
+        title_prompt = TITLE_CREATION_PROMPT.format(
+            terms=terms_formatted, 
+            search_keyword_terms=demo_keywords
+        )
+        
+        desc_prompt = DESCRIPTION_CREATION_PROMPT.format(
+            terms=terms_formatted,
+            search_keyword_terms=demo_keywords  
+        )
+        
+        return jsonify({
+            'success': True,
+            'prompts': {
+                'title': {
+                    'name': 'Title Creation (Real Prompt)',
+                    'prompt': title_prompt
+                },
+                'description': {
+                    'name': 'Description Creation (Real Prompt)', 
+                    'prompt': desc_prompt
+                },
+                'simple': {
+                    'name': 'Simple Test',
+                    'prompt': 'Write just the word "TEST" and nothing else.'
+                },
+                'hebrew': {
+                    'name': 'Hebrew Test',
+                    'prompt': 'כתוב לי ברכה קצרה בעברית'
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/test-gpt', methods=['POST'])
 def test_gpt():
     """Test GPT with custom prompt"""
@@ -1823,15 +1910,32 @@ def dashboard():
                 <div class="mt-3">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">🧪 Test GPT Connection</h3>
                     
+                    <!-- Prompt Type Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Choose prompt type:
+                        </label>
+                        <select x-model="selectedPromptType" @change="loadSamplePrompt()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="custom">Custom Prompt</option>
+                            <option value="simple">Simple Test</option>
+                            <option value="hebrew">Hebrew Test</option>
+                            <option value="title">Title Creation (Real)</option>
+                            <option value="description">Description Creation (Real)</option>
+                        </select>
+                    </div>
+
                     <!-- Input Form -->
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Enter your prompt:
+                            Your prompt:
                         </label>
                         <textarea 
                             x-model="gptTestPrompt"
+                            :readonly="selectedPromptType !== 'custom'"
+                            :class="selectedPromptType !== 'custom' ? 'bg-gray-50' : ''"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                            rows="4" 
+                            rows="6" 
                             placeholder="Enter your prompt here... (e.g., 'Write a short greeting in Hebrew')">
                         </textarea>
                     </div>
@@ -2034,6 +2138,7 @@ def dashboard():
                 gptTesting: false,
                 gptTestPrompt: '',
                 gptTestResult: null,
+                selectedPromptType: 'custom',
                 newProject: {
                     name: '',
                     website_url: '',
@@ -2481,6 +2586,27 @@ def dashboard():
                 resetGptTest() {
                     this.gptTestPrompt = '';
                     this.gptTestResult = null;
+                },
+
+                async loadSamplePrompt() {
+                    if (this.selectedPromptType === 'custom') {
+                        this.gptTestPrompt = '';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/get-sample-prompts');
+                        const data = await response.json();
+                        
+                        if (data.success && data.prompts[this.selectedPromptType]) {
+                            this.gptTestPrompt = data.prompts[this.selectedPromptType].prompt;
+                        } else {
+                            alert('❌ Could not load sample prompt');
+                        }
+                    } catch (error) {
+                        console.error('Error loading sample prompt:', error);
+                        alert('❌ Error loading sample prompt');
+                    }
                 }
             }
         }
