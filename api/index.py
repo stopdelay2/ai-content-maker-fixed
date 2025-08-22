@@ -1064,18 +1064,48 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
             response_data, status_code = initial_content_evaluation
         else:
             response_data = initial_content_evaluation
+        
+        print(f"🎯 Starting content optimization process...")
+        
+        # Run content optimization process
+        try:
+            optimized_content_dict = content_optimization_process(response_data, site)
+            print(f"🎯 Optimization completed: {optimized_content_dict.get('success', False)}")
             
-        # Create final response with the generated content
-        final_response = {
-            'success': True,
-            'message': 'Article content created successfully.',
-            'title': response_data.get('main_article_title', ''),
-            'meta_description': response_data.get('main_article_description', ''),
-            'article_content': response_data.get('article_content', 'Basic article content generated'),
-            'content_score': response_data.get('content_score', 0)
-        }
+            if optimized_content_dict.get('success'):
+                # Use optimized content
+                final_response = {
+                    'success': True,
+                    'message': 'Article content created and optimized successfully.',
+                    'title': response_data.get('main_article_title', ''),
+                    'meta_description': response_data.get('main_article_description', ''),
+                    'article_content': optimized_content_dict.get('updated_html_content', response_data.get('article_content', '')),
+                    'content_score': optimized_content_dict.get('content_score', response_data.get('content_score', 0))
+                }
+            else:
+                # Fall back to basic content if optimization fails
+                print("⚠️ Optimization failed, using basic content")
+                final_response = {
+                    'success': True,
+                    'message': 'Article content created successfully (optimization failed).',
+                    'title': response_data.get('main_article_title', ''),
+                    'meta_description': response_data.get('main_article_description', ''),
+                    'article_content': response_data.get('article_content', 'Basic article content generated'),
+                    'content_score': response_data.get('content_score', 0)
+                }
+        except Exception as opt_e:
+            print(f"❌ Optimization process failed: {opt_e}")
+            # Fall back to basic content
+            final_response = {
+                'success': True,
+                'message': 'Article content created successfully (optimization error).',
+                'title': response_data.get('main_article_title', ''),
+                'meta_description': response_data.get('main_article_description', ''),
+                'article_content': response_data.get('article_content', 'Basic article content generated'),
+                'content_score': response_data.get('content_score', 0)
+            }
 
-        print('Article creation completed successfully')
+        print('Article creation and optimization completed successfully')
         print(json.dumps(final_response, indent=4))
         return final_response, 200
 
