@@ -40,45 +40,79 @@ anchors_config_path = os.getenv('ANCHORS_CONFIG_PATH')
 
 # Essential Neuron Writer functions
 def neuron_new_query(project_id, keyword, engine, language):
-    """Create a new query in Neuron Writer"""
+    """Create a new query in Neuron Writer - DEMO VERSION"""
     import json
-    import requests
     
+    # TODO: Remove this demo data and restore real API call after development is complete
+    # Original API call commented out to save API quota during development
+    """
     headers = {
         "X-API-KEY": neuron_api_key,
-        "Accept": "application/json",
+        "Accept": "application/json", 
         "Content-Type": "application/json",
     }
+    payload = json.dumps({"project": project_id, "keyword": keyword, "engine": engine, "language": language})
+    response = requests.request("POST", neuron_api_endpoint + "/new-query", headers=headers, data=payload)
+    return response.json()
+    """
     
-    payload = json.dumps({
-        "project": project_id,
-        "keyword": keyword,
-        "engine": engine,
-        "language": language,
-    })
+    # Demo response based on typical Neuron Writer API structure
+    demo_response = {
+        "query": "demo_query_12345",
+        "status": "created",
+        "message": "Query created successfully (DEMO MODE)"
+    }
     
-    response = requests.request(
-        "POST",
-        neuron_api_endpoint + "/new-query",
-        headers=headers,
-        data=payload)
-    
-    print(f"Neuron API Response Status: {response.status_code}")
-    print(f"Neuron API Response Text: {response.text[:500]}...")
-    
-    if response.status_code != 200:
-        raise Exception(f"Neuron API error: {response.status_code} - {response.text}")
-    
-    try:
-        return response.json()
-    except json.JSONDecodeError as e:
-        raise Exception(f"Invalid JSON response from Neuron API: {response.text[:200]}")
+    print(f"🧪 DEMO MODE: Created query for keyword '{keyword}' in {language}")
+    return demo_response
 
 def neuron_get_query(query_id):
     """Get query results from Neuron Writer"""
     import json
     import requests
     
+    # DEMO MODE - Remove this block and uncomment real API call below when ready for production
+    demo_response = {
+        "status": "ready",
+        "query": query_id,
+        "terms": {
+            "title": [
+                {"term": "אלי אקספרס", "score": 95},
+                {"term": "קופונים", "score": 90},
+                {"term": "הנחות", "score": 85}
+            ],
+            "desc": [
+                {"term": "חיסכון", "score": 88},
+                {"term": "מבצעים", "score": 85},
+                {"term": "קניות אונליין", "score": 82}
+            ],
+            "h1": [
+                {"term": "מדריך קופונים", "score": 92},
+                {"term": "איך לחסוך", "score": 88},
+                {"term": "קניות חכמות", "score": 85}
+            ],
+            "h2": [
+                {"term": "קודי הנחה", "score": 90},
+                {"term": "טיפים לקניות", "score": 87},
+                {"term": "מוצרים מומלצים", "score": 83}
+            ],
+            "content_basic": [
+                {"term": "אלי אקספרס", "usage": 3},
+                {"term": "קופון", "usage": 5},
+                {"term": "הנחה", "usage": 4}
+            ],
+            "content_extended": [
+                {"term": "קניות", "usage": 2},
+                {"term": "מחיר", "usage": 3},
+                {"term": "משלוח", "usage": 2}
+            ]
+        }
+    }
+    print(f"🧪 DEMO MODE: Retrieved query results for {query_id}")
+    return demo_response
+    
+    # REAL API CALL - Uncomment this section for production use:
+    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -94,12 +128,24 @@ def neuron_get_query(query_id):
         data=payload)
     
     return response.json()
+    """
 
 def neuron_import_content(query_id, content, title, description):
     """Import content to Neuron Writer"""
     import json
     import requests
     
+    # DEMO MODE - Remove this block for production use
+    demo_response = {
+        "content_score": 75,
+        "message": "Content imported successfully (DEMO MODE)",
+        "status": "success"
+    }
+    print(f"🧪 DEMO MODE: Imported content with title '{title}' - Score: {demo_response['content_score']}")
+    return demo_response
+    
+    # REAL API CALL - Uncomment for production:
+    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -120,12 +166,24 @@ def neuron_import_content(query_id, content, title, description):
         data=payload)
     
     return response.json()
+    """
 
 def neuron_evaluate_content(query_id, content, title, description):
     """Evaluate content in Neuron Writer"""
     import json
     import requests
     
+    # DEMO MODE - Remove this block for production use
+    demo_response = {
+        "content_score": 82,
+        "message": "Content evaluated successfully (DEMO MODE)",
+        "status": "success"
+    }
+    print(f"🧪 DEMO MODE: Evaluated content - Score: {demo_response['content_score']}")
+    return demo_response
+    
+    # REAL API CALL - Uncomment for production:
+    """
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -146,6 +204,7 @@ def neuron_evaluate_content(query_id, content, title, description):
         data=payload)
     
     return response.json()
+    """
 
 # Essential OpenAI functions
 def gpt_generate_title(model, terms, keywords):
