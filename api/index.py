@@ -368,7 +368,7 @@ def gpt_reduce_terms(model, content, terms):
     """Reduce terms usage - simplified version"""
     return content
 
-print("✅ Essential functions embedded for article creation - updated endpoint")
+print("✅ Essential functions embedded for article creation - YAML prompts integrated")
 
 app = Flask(__name__)
 
