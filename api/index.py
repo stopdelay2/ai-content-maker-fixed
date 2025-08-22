@@ -284,23 +284,42 @@ def gpt_generate_title(model, terms, keywords):
     client = OpenAI(api_key=openai_key)
     
     # Format terms properly
+    print(f"🔍 DEBUG: Raw terms input: {terms}")
+    print(f"🔍 DEBUG: Raw keywords input: {keywords}")
+    
     if isinstance(terms, list):
         terms_formatted = "\n".join([f"{term.get('term', str(term))}: {term.get('score', 0)}%" if isinstance(term, dict) else str(term) for term in terms])
     else:
         terms_formatted = str(terms)
     
+    print(f"🔍 DEBUG: Formatted terms: {terms_formatted}")
+    print(f"🔍 DEBUG: Keywords for prompt: {keywords}")
+    
     prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
-    print(f"🔍 GPT Title Prompt: {prompt[:300]}...")
+    print(f"🔍 DEBUG: FULL PROMPT BEING SENT TO GPT:")
+    print(prompt)
+    print(f"🔍 DEBUG: End of prompt")
     
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=100
-    )
+    # Stop here to see the exact prompt before sending to GPT
+    print("🛑 STOPPING BEFORE GPT CALL - Check the prompt above")
+    return "DEBUG: Stopped before GPT call"
     
-    result = response.choices[0].message.content.strip()
-    print(f"🔍 GPT Title Result: '{result}'")
-    return result
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=100
+        )
+        
+        print(f"🔍 GPT Response: {response}")
+        result = response.choices[0].message.content
+        print(f"🔍 GPT Title Result Raw: '{result}'")
+        result = result.strip() if result else ""
+        print(f"🔍 GPT Title Result Stripped: '{result}'")
+        return result
+    except Exception as e:
+        print(f"❌ Error in GPT title generation: {e}")
+        return f"Error: {str(e)}"
 
 def gpt_generate_description(model, terms, keywords):
     """Generate meta description using OpenAI"""
@@ -837,23 +856,23 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         main_article_description = gpt_generate_description(openai_model, main_description_terms, main_search_keyword_terms)
         print(f"🔍 Generated description: '{main_article_description}'")
 
-        # TEMPORARY: Stop here for testing title and description generation
-        print("🛑 STOPPING HERE FOR TESTING - Title and Description generated")
+        print("🔍 DEBUGGING: Before generating article content")
+        print(f"🔍 Generated title so far: '{main_article_title}'")
+        print(f"🔍 Generated description so far: '{main_article_description}'")
+        
+        # Stop here to debug - return before article generation to focus on title/description issue
         return_dict = {
             "main_article_title": main_article_title,
             "main_article_description": main_article_description,
-            "main_article_content": "TEST CONTENT - Article generation stopped for testing",
+            "main_article_content": "DEBUGGING: Stopped before article generation",
             "import_content_response": {"content_score": 75},
-            "h1_terms_string": "TEST H1",
-            "h2_terms_string": "TEST H2", 
+            "h1_terms_string": "DEBUG H1",
+            "h2_terms_string": "DEBUG H2", 
             "main_search_keyword_terms": main_search_keyword_terms,
             "main_query_id": main_query_id,
             "neuron_query_response_data": neuron_query_response_data
         }
         return return_dict
-        
-        # ORIGINAL CODE BELOW - Will be restored after testing:
-        """
         # create article with GPT
         main_h1_terms = neuron_query_response_data['terms']["h1"]
         main_h2_terms = neuron_query_response_data['terms']["h2"]
