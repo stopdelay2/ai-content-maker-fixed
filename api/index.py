@@ -210,11 +210,29 @@ def neuron_evaluate_content(query_id, content, title, description):
 def gpt_generate_title(model, terms, keywords):
     """Generate title using OpenAI"""
     from openai import OpenAI
+    import yaml
     
     client = OpenAI(api_key=openai_key)
     
-    prompt = f"Generate a compelling title in Hebrew for an article about '{keywords}' using these terms: {terms}"
-    print(f"🔍 GPT Title Prompt: {prompt}")
+    # Load prompts from YAML file
+    try:
+        with open('/var/task/prompts.yaml', 'r', encoding='utf-8') as file:
+            prompts = yaml.safe_load(file)
+        title_prompt_template = prompts['title_creation_prompt']
+    except:
+        # Fallback prompt if YAML not available
+        title_prompt_template = """Create a compelling title in Hebrew for an article.
+        Terms: {terms}
+        Keywords: {search_keyword_terms}"""
+    
+    # Format terms properly
+    if isinstance(terms, list):
+        terms_formatted = "\n".join([f"{term.get('term', str(term))}: {term.get('score', 0)}%" if isinstance(term, dict) else str(term) for term in terms])
+    else:
+        terms_formatted = str(terms)
+    
+    prompt = title_prompt_template.format(terms=terms_formatted, search_keyword_terms=keywords)
+    print(f"🔍 GPT Title Prompt: {prompt[:300]}...")
     
     response = client.chat.completions.create(
         model=model,
@@ -223,17 +241,35 @@ def gpt_generate_title(model, terms, keywords):
     )
     
     result = response.choices[0].message.content.strip()
-    print(f"🔍 GPT Title Result: {result}")
+    print(f"🔍 GPT Title Result: '{result}'")
     return result
 
 def gpt_generate_description(model, terms, keywords):
     """Generate meta description using OpenAI"""
     from openai import OpenAI
+    import yaml
     
     client = OpenAI(api_key=openai_key)
     
-    prompt = f"Generate a meta description in Hebrew (max 160 chars) for an article about '{keywords}' using these terms: {terms}"
-    print(f"🔍 GPT Description Prompt: {prompt}")
+    # Load prompts from YAML file
+    try:
+        with open('/var/task/prompts.yaml', 'r', encoding='utf-8') as file:
+            prompts = yaml.safe_load(file)
+        description_prompt_template = prompts['description_creation_prompt']
+    except:
+        # Fallback prompt if YAML not available
+        description_prompt_template = """Create a meta description in Hebrew for an article.
+        Terms: {terms}
+        Keywords: {search_keyword_terms}"""
+    
+    # Format terms properly
+    if isinstance(terms, list):
+        terms_formatted = "\n".join([f"{term.get('term', str(term))}: {term.get('score', 0)}%" if isinstance(term, dict) else str(term) for term in terms])
+    else:
+        terms_formatted = str(terms)
+    
+    prompt = description_prompt_template.format(terms=terms_formatted, search_keyword_terms=keywords)
+    print(f"🔍 GPT Description Prompt: {prompt[:300]}...")
     
     response = client.chat.completions.create(
         model=model,
@@ -242,7 +278,7 @@ def gpt_generate_description(model, terms, keywords):
     )
     
     result = response.choices[0].message.content.strip()
-    print(f"🔍 GPT Description Result: {result}")
+    print(f"🔍 GPT Description Result: '{result}'")
     return result
 
 def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
