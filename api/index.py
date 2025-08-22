@@ -84,6 +84,10 @@ def neuron_import_content(query_id, content, title, description):
     
     print(f"🧠 NEURON API: Importing content with title '{title[:50]}...'")
     
+    # Clean and prepare HTML content
+    clean_content = strip_code_fences(content)
+    html_content = ensure_html_document(clean_content)
+    
     headers = {
         "X-API-KEY": neuron_api_key,
         "Accept": "application/json",
@@ -92,9 +96,9 @@ def neuron_import_content(query_id, content, title, description):
     
     payload = json.dumps({
         "query": query_id,
-        "content": content,
+        "html": html_content,  # Neuron expects 'html' not 'content'
         "title": title,
-        "meta_description": description
+        "description": description  # Use 'description' not 'meta_description'
     })
     
     response = requests.request(
@@ -118,11 +122,15 @@ def neuron_evaluate_content(query_id, content, title, description):
         "Content-Type": "application/json",
     }
     
+    # Clean and prepare HTML content
+    clean_content = strip_code_fences(content) 
+    html_content = ensure_html_document(clean_content)
+    
     payload = json.dumps({
         "query": query_id,
-        "content": content,
+        "html": html_content,  # Neuron expects 'html' not 'content'
         "title": title,
-        "meta_description": description
+        "description": description  # Use 'description' not 'meta_description'
     })
     
     response = requests.request(
@@ -132,6 +140,45 @@ def neuron_evaluate_content(query_id, content, title, description):
         data=payload)
     
     return response.json()
+
+# Content processing utilities
+def strip_code_fences(s: str) -> str:
+    """Remove code fences (```html, ```) from GPT response"""
+    if not s:
+        return s
+    s = s.strip()
+    if s.startswith("```"):
+        # Remove first line (``` or ```html)
+        s = s.split('\n', 1)[1] if '\n' in s else ''
+        # Remove final ```
+        if s.endswith("```"):
+            s = s[:-3]
+    return s.strip()
+
+def ensure_html_document(s: str) -> str:
+    """Ensure content is wrapped in proper HTML document with RTL support"""
+    if not s:
+        return s
+    
+    low = s.lower().lstrip()
+    if not (low.startswith("<!doctype html") or low.startswith("<html")):
+        s = f"""<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AliExpress – קופונים והנחות</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }}
+        h1, h2, h3 {{ color: #333; }}
+        p {{ margin-bottom: 15px; }}
+    </style>
+</head>
+<body>
+{s}
+</body>
+</html>"""
+    return s
 
 # Embedded prompts (from prompts.yaml)
 TITLE_CREATION_PROMPT = """Task:
@@ -888,16 +935,22 @@ def create_article_logic_embedded(main_project_id, main_keyword, main_engine, ma
         # create main article with GPT
         main_article_content = gpt_generate_article(openai_model, title_terms_string, h1_terms_string, h2_terms_string, main_content_terms)
 
+        # Clean article content before uploading
+        clean_article_content = strip_code_fences(main_article_content)
+        final_html_content = ensure_html_document(clean_article_content)
+        
         # upload initial article to neuron writer API, and get initial score
         import_content_response = neuron_import_content(main_query_id, main_article_content, main_article_title, main_article_description)
+        
+        print(f"🧠 NEURON IMPORT RESPONSE: {import_content_response}")
 
         return_dict = {
             'success': True,
             'message': 'Article created successfully with full content',
             'main_article_title': main_article_title,
             'main_article_description': main_article_description,
-            'article_content': main_article_content,
-            'content_score': import_content_response.get('score', 0) if isinstance(import_content_response, dict) else 0,
+            'article_content': final_html_content,  # Return cleaned HTML
+            'content_score': import_content_response.get('content_score', import_content_response.get('score', 0)) if isinstance(import_content_response, dict) else 0,
             # Keep additional data for potential optimization
             "import_content_response": import_content_response,
             "h1_terms_string": h1_terms_string,
