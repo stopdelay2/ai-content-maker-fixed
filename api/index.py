@@ -206,24 +206,82 @@ def neuron_evaluate_content(query_id, content, title, description):
     return response.json()
     """
 
+# Embedded prompts (from prompts.yaml)
+TITLE_CREATION_PROMPT = """Task:
+
+Create a compelling, SEO-optimized title for a content article. The title should effectively incorporate the given terms, prioritizing them based on their usage percentages to achieve a high score in NeuronWriter.
+
+Instructions:
+
+Terms and Usage Percentages:
+
+Use the following list of terms to craft the title. Each term comes with a usage percentage indicating its importance—the higher the percentage, the more prominently the term should feature in the title.
+  
+  {terms}
+
+Also, incorporate these additional terms exactly as they are, without altering them. Also, do not add any characters before or after them, these specific terms must come after a space character and before a space character (unless they are the first or the last word of the title), you MUST incorporate these terms exactly as they are:
+
+{search_keyword_terms}
+
+Title Requirements:
+
+Incorporate Key Terms: Prioritize including terms with higher usage percentages.
+
+Natural Language: Ensure the title reads naturally and is grammatically correct.
+
+SEO Optimization:
+
+Length: Aim for a title length between 60-70 characters.
+Relevance: Make the title relevant to the topic suggested by the terms.
+Engagement: Craft the title to be engaging and enticing to readers.
+Formatting:
+
+Provide only the final title without additional explanations or annotations.
+Do not include the usage percentages in the title.
+
+Your Task:
+
+Using the instructions above and the provided terms, generate one title for the content article."""
+
+DESCRIPTION_CREATION_PROMPT = """Task:
+Create an SEO-optimized meta description for a content article. The meta description should effectively incorporate the given terms, prioritizing them based on their usage percentages to achieve a high score in NeuronWriter.
+
+Instructions:
+
+Terms and Usage Percentages:
+
+Use the following list of terms to craft the meta description. Each term comes with a usage percentage indicating its importance—the higher the percentage, the more prominently the term should feature in the description.
+{terms}
+
+Also, incorporate these additional terms exactly as they are, without altering them. Also, do not add any characters before or after them, these specific terms must come after a space character and before a space character (unless they are the first or the last word of the string), you MUST incorporate these terms exactly as they are:
+{search_keyword_terms}
+
+Meta Description Requirements:
+
+Length: Aim for a meta description length of up to 155-160 characters to ensure it displays fully in search engine results.
+
+Incorporate Key Terms: Prioritize including terms with higher usage percentages.
+
+Natural Language: Ensure the meta description reads naturally and is grammatically correct.
+
+SEO Optimization:
+
+Relevance: Make the description relevant to the content of the article and enticing to users.
+Call to Action (Optional): Include a call to action if appropriate.
+
+Formatting:
+Provide only the final meta description without additional explanations or annotations.
+Do not include the usage percentages in the description.
+
+Your Task:
+Using the instructions above and the provided terms, generate one meta description for the content article."""
+
 # Essential OpenAI functions
 def gpt_generate_title(model, terms, keywords):
     """Generate title using OpenAI"""
     from openai import OpenAI
-    import yaml
     
     client = OpenAI(api_key=openai_key)
-    
-    # Load prompts from YAML file
-    try:
-        with open('/var/task/prompts.yaml', 'r', encoding='utf-8') as file:
-            prompts = yaml.safe_load(file)
-        title_prompt_template = prompts['title_creation_prompt']
-    except:
-        # Fallback prompt if YAML not available
-        title_prompt_template = """Create a compelling title in Hebrew for an article.
-        Terms: {terms}
-        Keywords: {search_keyword_terms}"""
     
     # Format terms properly
     if isinstance(terms, list):
@@ -231,7 +289,7 @@ def gpt_generate_title(model, terms, keywords):
     else:
         terms_formatted = str(terms)
     
-    prompt = title_prompt_template.format(terms=terms_formatted, search_keyword_terms=keywords)
+    prompt = TITLE_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
     print(f"🔍 GPT Title Prompt: {prompt[:300]}...")
     
     response = client.chat.completions.create(
@@ -247,20 +305,8 @@ def gpt_generate_title(model, terms, keywords):
 def gpt_generate_description(model, terms, keywords):
     """Generate meta description using OpenAI"""
     from openai import OpenAI
-    import yaml
     
     client = OpenAI(api_key=openai_key)
-    
-    # Load prompts from YAML file
-    try:
-        with open('/var/task/prompts.yaml', 'r', encoding='utf-8') as file:
-            prompts = yaml.safe_load(file)
-        description_prompt_template = prompts['description_creation_prompt']
-    except:
-        # Fallback prompt if YAML not available
-        description_prompt_template = """Create a meta description in Hebrew for an article.
-        Terms: {terms}
-        Keywords: {search_keyword_terms}"""
     
     # Format terms properly
     if isinstance(terms, list):
@@ -268,7 +314,7 @@ def gpt_generate_description(model, terms, keywords):
     else:
         terms_formatted = str(terms)
     
-    prompt = description_prompt_template.format(terms=terms_formatted, search_keyword_terms=keywords)
+    prompt = DESCRIPTION_CREATION_PROMPT.format(terms=terms_formatted, search_keyword_terms=keywords)
     print(f"🔍 GPT Description Prompt: {prompt[:300]}...")
     
     response = client.chat.completions.create(
