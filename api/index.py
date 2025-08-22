@@ -159,7 +159,7 @@ def gpt_generate_title(model, terms, keywords):
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=100
+        max_completion_tokens=100
     )
     
     return response.choices[0].message.content.strip()
@@ -175,7 +175,7 @@ def gpt_generate_description(model, terms, keywords):
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=100
+        max_completion_tokens=100
     )
     
     return response.choices[0].message.content.strip()
@@ -197,7 +197,7 @@ def gpt_generate_article(model, title_terms, h1_terms, h2_terms, content_terms):
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=2000
+        max_completion_tokens=2000
     )
     
     return response.choices[0].message.content.strip()
